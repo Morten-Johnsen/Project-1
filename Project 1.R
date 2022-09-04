@@ -10,3 +10,7 @@ ggplot(test.data)+
   theme_linedraw()+
   labs(x = "", y = "", fill = "ID")+
   ggtitle("Test hist")
+
+
+print("Hello world")
+print("Hello Victor")
