@@ -1,3 +1,4 @@
+rm(list = ls())
 #setwd("Replace with path to directory containing project files.")
 D <- read.table("tuno.txt", header=TRUE, sep=" ", 
                 as.is=TRUE)
