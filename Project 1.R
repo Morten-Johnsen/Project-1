@@ -11,6 +11,4 @@ ggplot(test.data)+
   labs(x = "", y = "", fill = "ID")+
   ggtitle("Test hist")
 
-
-print("Hello world")
-print("Hello Victor")
+print('please virk')
