@@ -2,6 +2,7 @@ rm(list = ls())
 library(lubridate)
 library(tidyverse)
 library(reshape)
+library(pheatmap)
 #setwd("Replace with path to directory containing project files.")
 D <- read.table("tuno.txt", header=TRUE, sep=" ", 
                 as.is=TRUE)
