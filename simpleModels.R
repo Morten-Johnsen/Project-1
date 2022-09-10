@@ -38,62 +38,62 @@ testDistribution <- function(p, x, distribution = "Normal", giveDistributions = 
     shape2 <- p[2]
     NLL <- -sum(dbeta(x, shape = shape1, shape2 = shape2, log = T))
   }
+  if (str_to_lower(distribution) == "exponential"){
+    lambda = p
+    NLL <- -sum(dexp(x, rate = lambda, log = T))
+  }
+  
+  if (str_to_lower(distribution) == "weibull"){
+    shape = p[1]
+    scale = p[2]
+    NLL <- -sum(dweibull(x, shape = shape, scale = scale, log = T))
+  }
   if (str_to_lower(distribution) == "negative binomial"){
     alpha <- p[1] #target number of succesfull trials
-    pi <- p[2] #probability of succes in each trial
-    NLL <- -sum(dnbinom(alpha, size = x, prob = pi, log = T))
+    probs <- p[2] #probability of succes in each trial
+    NLL <- -sum(dnbinom(x = alpha, size = x, prob = probs, log = T))
   }
   return(NLL)
 }
 
 #### WINDPOWER ####
-#Wind power have been normalized to lie between 0-1, so we use the second transformation in the
-#assigment to see if we can get a normal distribution:
-lambda <- 0.5
-D$pow.obs.norm.trans <- 2*log(D$pow.obs.norm^lambda/(1-D$pow.obs.norm)^(1-lambda))
-qqplot(rnorm(length(D$pow.obs.norm.trans), mean = mean(D$pow.obs.norm.trans), sd = sd(D$pow.obs.norm.trans)), D$pow.obs.norm.trans)
-
 #Fitting models to wind power:
-dists <- testDistribution(c(NA,NA), NA, giveDistributions = T)
-opt.parms <- matrix(NA, nrow = length(dists), ncol = 2)
-
-for (i in 1:length(dists)){
-  opt.temp <- nlminb(start = c(1,0.5), objective = testDistribution,
-         x = D$pow.obs.norm,
-         distribution = dists[i],
-         lower = c(0,0))
-  opt.parms[i,] <- opt.temp$par
-}
+par <- nlminb(start = 0.2, objective = testDistribution,
+              distribution = "exponential",
+              x = D$pow.obs.norm)
 
 ggplot(D)+
-  geom_histogram(aes(x = pow.obs.norm)
-                 , bins = 30)+
+  geom_histogram(aes(x = pow.obs.norm, y = ..density..), bins = 20)+
   theme_bw()+
-  stat_function(fun = dnorm,   n = length(D$pow.obs.norm), args = list(mean = opt.parms[1,1], sd = opt.parms[1,2]))+
-  stat_function(fun = dgamma,  n = length(D$pow.obs.norm), args = list(shape = opt.parms[2,1], rate = opt.parms[2,2]))+
-  stat_function(fun = dbeta,   n = length(D$pow.obs.norm), args = list(shape1 = opt.parms[3,1], shape2 = opt.parms[3,2]))+
-  stat_function(fun = dnbinom, n = length(D$pow.obs.norm), args = list(size = opt.parms[4,1], prob = opt.parms[4,2]))
-  
+  stat_function(fun = dexp, n = length(D$pow.obs.norm), args = list(rate = par$par))
 
 g.pow.obs
 #### WIND SPEED ####
-ws30_N <- nlminb(start = c(0,1), objective = testDistribution
+par.ws30 <- nlminb(start = c(1,1), objective = testDistribution
             , x = D$ws30
+            , distribution = "weibull"
             , lower = c(0,0))
-
-ws30_G <- nlminb(start = c(1,1), objective = testDistribution
-                 , x = D$ws30
-                 , distribution = "gamma"
-                 , lower = c(0,0))
 
 
 ggplot(D)+
   geom_histogram(aes(x = ws30, y = ..count../sum(..count..))
                  , colour = "white"
                  , bins = 30)+
-  stat_function(fun = dnorm, n = 101, args = list(mean = ws30_N$par[1], sd = ws30_N$par[2]))+
-  stat_function(fun = dgamma
-                , n = 101
-                , args = list(shape = ws30_G$par[1], rate = ws30_G$par[2])
-                , colour = "blue")
+  theme_bw()+
+  stat_function(fun = dweibull, n = dim(D)[1], args = list(shape = par.ws30$par[1], scale = par.ws30$par[2]))
 
+#### WIND DIRECTION ####
+#centrerer fordelingen omkring 3/2pi
+D$wd30.centered <- D$wd30 - pi/2; D$wd30.centered[D$wd30.centered < 0] = D$wd30.centered[D$wd30.centered < 0] + 2*pi
+par.wd30 <- nlminb(start = c(4,4),
+                   objective = testDistribution,
+                   x = D$wd30.centered,
+                   distribution = "normal")
+
+ggplot(D)+
+  theme_bw()+
+  geom_density(aes(x = wd30.centered, y = ..density..), alpha = .8, colour = "white", fill = "red", colour = "white")+
+  geom_density(aes(x = wd30, y = ..density..), colour = "white", alpha = .2, fill = "blue")+
+  scale_x_continuous(breaks = c(0,pi/2,pi,3/2*pi,2*pi)
+                     , labels =c("0", "pi/2", "pi", "3/2pi", "2pi"))+
+  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = par.wd30$par[1], sd = par.wd30$par[2]))
