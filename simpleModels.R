@@ -57,7 +57,7 @@ testDistribution <- function(p, x, distribution = "Normal", giveDistributions = 
   return(NLL)
 }
 
-#### WINDPOWER ####
+#### WIND POWER ####
 #Fitting models to wind power:
 par <- nlminb(start = 0.2, objective = testDistribution,
               distribution = "exponential",
@@ -132,7 +132,55 @@ H.pow <- hessian(l.pow.fun, mle.pow.exp, data = D$pow.obs.norm)
 V.pow <- as.numeric(-1/H.pow)
 wald.pow <- mle.pow.exp + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.pow)
 
-CI.pow;wald.pow
+## CI ## WIND SPEED
+par(mfrow=c(1,2))
+#likelihood-based
+mle.ws30.weib <- par.ws30$par
+
+ws30.fun <- function(shape, scale, data){#####
+  prod(dweibull(x = data, shape = shape, scale = scale, log = F)*2)#to not get full zeros
+}
+
+l.ws30.fun <- function(shape, scale, data){#####
+  sum(dweibull(x = data, shape = shape, scale = scale, log = T))
+}
+
+CIfun.ws30 <- function(y, shape = T){##### T for shape, F for scale
+  if(shape){
+    sum(dweibull(x = D$ws30, shape = mle.ws30.weib[1], scale = mle.ws30.weib[2], log = T)) -
+      sum(dweibull(x = D$ws30, shape = y, scale = mle.ws30.weib[2], log = T)) - 
+      0.5 * qchisq(1-alpha, df = 1)
+  } else {
+    sum(dweibull(x = D$ws30, shape = mle.ws30.weib[1], scale = mle.ws30.weib[2], log = T)) -
+      sum(dweibull(x = D$ws30, shape = mle.ws30.weib[1], scale = y, log = T)) - 
+      0.5 * qchisq(1-alpha, df = 1) 
+  }
+}
+shapes <- seq(1, 3.5, by = 0.1)
+ws30.shape <- sapply(X = shapes, FUN = ws30.fun, scale = mle.ws30.weib[2], data = D$ws30)
+plot(shapes, ws30.shape/max(ws30.shape), col = 1, type = "l", xlab = "shape",
+     main = "Parameter value for shape for weibull model of wind speed")
+CI.ws30.shape <- c(uniroot(f = CIfun.ws30, interval = c(1, mle.ws30.weib[1]), shape = T)$root,
+                uniroot(f = CIfun.ws30, interval = c(mle.ws30.weib[1], 3.5), shape = T)$root)
+lines(range(shapes), c*c(1,1), col = 2)
+
+scales <- seq(7, 12, by = 0.1)
+ws30.scale <- sapply(X = scales, FUN = ws30.fun, shape = mle.ws30.weib[1], data = D$ws30)
+plot(scales, ws30.scale/max(ws30.scale), col = 1, type = "l", xlab = "scale",
+     main = "Parameter value for scale for weibull model of wind speed")
+CI.ws30.scale <- c(uniroot(f = CIfun.ws30, interval = c(7, mle.ws30.weib[2]), shape = F)$root,
+                   uniroot(f = CIfun.ws30, interval = c(mle.ws30.weib[2], 12), shape = F)$root)
+lines(range(scales), c*c(1,1), col = 2)
+
+#wald
+n <- dim(D)[1]
+H.ws30.shape <- hessian(l.ws30.fun, mle.ws30.weib[1], scale = mle.ws30.weib[2], data = D$ws30)
+V.ws30.shape <- as.numeric(-1/H.ws30.shape)
+H.ws30.scale <- hessian(l.ws30.fun, mle.ws30.weib[2], shape = mle.ws30.weib[1], data = D$ws30)
+V.ws30.scale <- as.numeric(-1/H.ws30.scale)
+wald.ws30.shape <- mle.ws30.weib[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30.shape)
+wald.ws30.scale <- mle.ws30.weib[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30.scale)
+
 
 ## CI ## WIND DIRECTION
 par(mfrow=c(1,2))
@@ -186,6 +234,10 @@ I22 <- n/( 2 * mle.wd30.norm[2]^4 );1/I22;V.wd30.sigma#Det driller med denne :(
 wald.wd30.mu <- mle.wd30.norm[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(1/I11)
 wald.wd30.sigmasq <- mle.wd30.norm[2]^2 + c(-1,1) * qnorm(1-alpha/2) * sqrt(1/I22)
 
-#All CIs
-rbind(CI.pow, wald.pow, CI.wd30.mu, wald.wd30.mu, CI.wd30.sigmasq, wald.wd30.sigmasq)
+#All CIs of parameters
+round(rbind(CI.pow, wald.pow, mle.pow.exp, CI.ws30.shape, wald.ws30.shape,
+            CI.ws30.scale, wald.ws30.scale,mle.ws30.weib, CI.wd30.mu, wald.wd30.mu,
+            CI.wd30.sigmasq, wald.wd30.sigmasq, c(mle.wd30.norm[1], mle.wd30.norm[2]^2)), digits=5)
 
+
+      
