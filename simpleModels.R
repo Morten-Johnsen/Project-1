@@ -4,13 +4,14 @@ library(tidyverse)
 library(reshape)
 library(stringr)
 library(pheatmap)
+library(numDeriv)
 
 #Retrieve data from the descriptive statistics script
 ##### TILPAS DEN HER TIL DEN COMPUTER DEER BRUGES
 if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
   setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/Statistical Modelling/Project-1/")
 } else {
-  print("Fejl: Viktor, Indsæt lokationen på din egen folder her")
+  setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
 }
 
 source("descriptiveStatistics.R")
@@ -67,7 +68,40 @@ ggplot(D)+
   theme_bw()+
   stat_function(fun = dexp, n = length(D$pow.obs.norm), args = list(rate = par$par))
 
-g.pow.obs
+## CI ##
+par(mfrow=c(1,1))
+alpha <- 0.05
+c <- exp(-0.5 * qchisq(1-alpha, df = 1))
+#likelihood-based
+mle.pow.exp <- par$par
+
+pow.fun <- function(lambda, data){
+  prod(dexp(x = data, rate = lambda, log = F))
+}
+
+l.pow.fun <- function(lambda, data){
+  sum(dexp(x = data, rate = lambda, log = T))
+}
+
+CIfun.pow <- function(y){
+  sum(dexp(x = D$pow.obs.norm, rate = mle.pow.exp, log = T)) -
+    sum(dexp(x = D$pow.obs.norm, rate = y, log = T)) -
+    0.5 * qchisq(1-alpha, df = 1)
+}
+lambdas <- seq(0.2,7, by = 0.1)
+pow <- sapply(X = lambdas, FUN = pow.fun, data = D$pow.obs.norm)
+plot(lambdas, pow/max(pow), col = 1, type = "l", xlab = expression(paste(lambda)),
+     main = "Parameter values for exponential model of power production")
+CI.pow <- c(uniroot(f = CIfun.pow, interval = c(0.2, mle.pow.exp))$root,
+            uniroot(f = CIfun.pow, interval = c(mle.pow.exp, 7))$root)
+lines(range(lambdas), c*c(1,1), col = 2)
+
+H.pow <- hessian(l.pow.fun, mle.pow.exp, data = D$pow.obs.norm)
+V.pow <- as.numeric(-1/H.pow)
+wald.pow <- mle.pow.exp + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.pow)
+
+CI.pow;wald.pow
+#g.pow.obs
 #### WIND SPEED ####
 par.ws30 <- nlminb(start = c(1,1), objective = testDistribution
             , x = D$ws30
