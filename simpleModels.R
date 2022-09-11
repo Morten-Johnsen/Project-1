@@ -10,7 +10,7 @@ library(pheatmap)
 if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
   setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/Statistical Modelling/Project-1/")
 } else {
-  print("Fejl: Viktor, Indsæt lokationen på din egen folder her")
+  setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
 }
 
 source("descriptiveStatistics.R")
