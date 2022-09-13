@@ -19,7 +19,7 @@ testDistribution <- function(p, x, distribution = "Normal", giveDistributions = 
     #and not the fitting of the other two parameters.
     shape1 <- p[1]
     shape2 <- p[2]
-    NLL <- -sum(dbeta(x, shape = shape1, shape2 = shape2, log = T))
+    NLL <- -sum(dbeta(x, shape1 = shape1, shape2 = shape2, log = T))
   }
   if (str_to_lower(distribution) == "exponential"){
     lambda = p
