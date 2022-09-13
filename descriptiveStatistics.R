@@ -4,9 +4,22 @@ library(tidyverse)
 library(reshape)
 library(pheatmap)
 library(openair)
-setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
+
+if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
+  setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/Statistical Modelling/Project-1/")
+} else {
+  setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
+}
+
 D <- read.table("tuno.txt", header=TRUE, sep=" ", 
                 as.is=TRUE)
+
+D$date <- as.Date("2003-01-01")-1+D$r.day
+D$pow.obs.norm <- D$pow.obs/5000
+
+#Saved the data in Rdata format in the folder.
+#save(D, file = "~/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/Statistical Modelling/Project-1/dataWindPower.Rdata")
+
 ## Dimensions of D (number of rows and columns)
 dim(D)
 ##  Column/variable names
@@ -19,9 +32,6 @@ tail(D)
 summary(D)
 ## Another type of summary of the dataset
 str(D)
-
-D$date <- as.Date("2003-01-01")-1+D$r.day
-D$pow.obs.norm <- D$pow.obs/5000
 
 meltD <- D %>%
   select(-r.day, -month, -day, -pow.obs) %>%
