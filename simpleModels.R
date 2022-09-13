@@ -14,7 +14,8 @@ if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
   setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
 }
 
-source("descriptiveStatistics.R")
+load("dataWindPower.Rdata")
+source("testDistribution.R")
 
 testDistribution <- function(p, x, distribution = "Normal", giveDistributions = F){
   if (giveDistributions == T){
