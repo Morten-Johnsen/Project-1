@@ -235,9 +235,10 @@ wald.wd30.mu <- mle.wd30.norm[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(1/I11)
 wald.wd30.sigmasq <- mle.wd30.norm[2]^2 + c(-1,1) * qnorm(1-alpha/2) * sqrt(1/I22)
 
 #All CIs of parameters
+mle.wd30.norm.sq <- c(mle.wd30.norm[1], mle.wd30.norm[2]^2)
 round(rbind(CI.pow, wald.pow, mle.pow.exp, CI.ws30.shape, wald.ws30.shape,
             CI.ws30.scale, wald.ws30.scale,mle.ws30.weib, CI.wd30.mu, wald.wd30.mu,
-            CI.wd30.sigmasq, wald.wd30.sigmasq, c(mle.wd30.norm[1], mle.wd30.norm[2]^2)), digits=5)
+            CI.wd30.sigmasq, wald.wd30.sigmasq, mle.wd30.norm.sq), digits=5)
 
 
       
