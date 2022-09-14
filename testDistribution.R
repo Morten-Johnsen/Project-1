@@ -1,4 +1,4 @@
-testDistribution <- function(p, x, distribution = "Normal", giveDistributions = F){
+testDistribution <- function(p, x, distribution = "normal", giveDistributions = F){
   if (giveDistributions == T){
     NLL <- c("normal", "gamma", "beta", "negative binomial")
     distribution = "none"
@@ -32,6 +32,7 @@ testDistribution <- function(p, x, distribution = "Normal", giveDistributions = 
     NLL <- -sum(dweibull(x, shape = shape, scale = scale, log = T))
   }
   if (str_to_lower(distribution) == "negative binomial"){
+    #Virker ikke endnu
     alpha <- p[1] #target number of succesfull trials
     probs <- p[2] #probability of succes in each trial
     NLL <- -sum(dnbinom(x = alpha, size = x, prob = probs, log = T))
@@ -41,6 +42,10 @@ testDistribution <- function(p, x, distribution = "Normal", giveDistributions = 
     n <- x[2]
     k <- x[1]
     NLL <- -sum(dbinom(x = k, size = n, prob = p, log = T))
+  }
+  if (str_to_lower(distribution) == "poisson"){
+    lambda = p
+    NLL <- -sum(dpois(x = x, lambda = lambda, log = F))
   }
   return(NLL)
 }
