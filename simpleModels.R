@@ -19,21 +19,91 @@ source("testDistribution.R")
 
 #### WIND POWER ####
 #Fitting models to wind power:
-par <- nlminb(start = 0.2, objective = testDistribution,
-              distribution = "exponential",
-              x = D$pow.obs.norm)
+par.exp <- nlminb(start = 0.2, objective = testDistribution,
+                  distribution = "exponential",
+                  x = D$pow.obs.norm)
 
-ggplot(D)+
-  geom_histogram(aes(x = pow.obs.norm, y = ..density..), bins = 20)+
-  theme_bw()+
-  stat_function(fun = dexp, n = length(D$pow.obs.norm), args = list(rate = par$par))
+par.exp$objective
+
+par.beta <- nlminb(start = c(2,5)
+                   , objective = testDistribution
+                   , distribution = "beta"
+                   , x = D$pow.obs.norm
+                   , lower = c(0,0.8))
+par.beta$objective
+
+par.gamma <- nlminb(start = c(2,5)
+                    ,objective = testDistribution
+                    ,distribution = "gamma"
+                    ,x = D$pow.obs.norm)
+par.gamma$objective
+
+#Box-Cox transformation of pow.obs.norm
+#Examine different transformations and the achieved fit when fitting a normal
+#distribution
+
+lambda <- c(0.0, 0.05, 0.10, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4)
+pal <- palette.colors(length(lambda))
+BoxCoxPlot <- list()
+for (i in 1:length(lambda)){
+  xData <- 2*log(D$pow.obs.norm^lambda[i]/(1-D$pow.obs.norm)^(1-lambda[i]))
+  n <- nlminb(start = c(-1,1)
+              , objective = testDistribution
+              , x = xData
+              , distribution = "normal")
+  
+  simData <- rnorm(n = length(D$pow.obs.norm), mean = n$par[1], sd = n$par[2])
+  D$sim <- simData
+  
+  print(c(n$par, lambda[i], mean(D$sim), sd(D$sim)))
+  BoxCoxPlot[[paste0(lambda[i])]] <- ggplot(D)+
+    geom_histogram(aes(x = sim, y = ..density..)
+                   , colour = "white"
+                   , alpha = 0.5
+                   , fill = "black")+
+    geom_histogram(aes(x = 2*log(pow.obs.norm^lambda[i]/(1-pow.obs.norm)^(1-lambda[i])), y = ..density..)
+                   , colour = "white"
+                   , alpha = 0.6
+                   , fill = pal[[i]])+
+    labs(x = "BoxCox(pow.obs.norm)")+
+    ggtitle(paste0("BoxCox Transformation of Windpower, ", expression(lambda), " = ", lambda[i]))+
+    geom_text(x = -5, y = 0.23, label = paste0("NLL = ", round(n$objective,2)))+
+    geom_text(x = -5, y = 0.2, label = paste0("(mean, sd) = (", round(n$par[1],2), ",", round(n$par[2],2), ")"))+
+    stat_function(fun = dnorm, n = length(D$pow.obs.norm), args = list(mean = n$par[1], sd = n$par[2]), alpha = 0.6, colour = "black")
+}
+library(gridExtra)
+grid.arrange(grobs = BoxCoxPlot)
+
+
+#Compare distributions
+for (i in 1:10){
+  b <- ggplot(D)+
+    geom_histogram(aes(x = pow.obs.norm), colour = "white", alpha = 0.6)+
+    geom_histogram(aes(x = rbeta(length(pow.obs.norm), shape1 = par.beta$par[1]
+                                 ,shape2 = par.beta$par[2])), alpha = 0.2, fill = "blue")+
+    theme_bw()+
+    stat_function(fun = dbeta, n = length(D$pow.obs.norm), args = list(shape1 = par.beta$par[1],shape2 = par.beta$par[2]))
+  show(b)
+  Sys.sleep(2)
+}
+
+for (i in 1:10){
+  g <- ggplot(D)+
+    geom_histogram(aes(x = pow.obs.norm, y = ..density..))+
+    geom_histogram(aes(x = rexp(length(pow.obs.norm), rate = par.exp$par), y = ..density..)
+                   , alpha = 0.2, fill = "blue")+
+    theme_bw()+
+    stat_function(fun = dexp, n = length(D$pow.obs.norm), args = list(rate = par.exp$par))
+  show(g)
+  Sys.sleep(2)
+}
 
 #g.pow.obs
 #### WIND SPEED ####
 par.ws30 <- nlminb(start = c(1,1), objective = testDistribution
-            , x = D$ws30
-            , distribution = "weibull"
-            , lower = c(0,0))
+                   , x = D$ws30
+                   , distribution = "weibull"
+                   , lower = c(0,0))
 
 
 ggplot(D)+
@@ -121,7 +191,7 @@ ws30.shape <- sapply(X = shapes, FUN = ws30.fun, scale = mle.ws30.weib[2], data 
 plot(shapes, ws30.shape/max(ws30.shape), col = 1, type = "l", xlab = "shape",
      main = "Parameter value for shape for weibull model of wind speed")
 CI.ws30.shape <- c(uniroot(f = CIfun.ws30, interval = c(1, mle.ws30.weib[1]), shape = T)$root,
-                uniroot(f = CIfun.ws30, interval = c(mle.ws30.weib[1], 3.5), shape = T)$root)
+                   uniroot(f = CIfun.ws30, interval = c(mle.ws30.weib[1], 3.5), shape = T)$root)
 lines(range(shapes), c*c(1,1), col = 2)
 
 scales <- seq(7, 12, by = 0.1)
@@ -171,7 +241,7 @@ wd30.mu <- sapply(X = mus, FUN = wd30.fun, sigma = mle.wd30.norm[2], data = D$wd
 plot(mus, wd30.mu/max(wd30.mu), col = 1, type = "l", xlab = expression(paste(mu)),
      main = "Parameter value for mean for normal model of wind direction")
 CI.wd30.mu <- c(uniroot(f = CIfun.wd30, interval = c(0, mle.wd30.norm[1]), mu = T)$root,
-            uniroot(f = CIfun.wd30, interval = c(mle.wd30.norm[1], 6), mu = T)$root)
+                uniroot(f = CIfun.wd30, interval = c(mle.wd30.norm[1], 6), mu = T)$root)
 lines(range(mus), c*c(1,1), col = 2)
 
 sigmas <- seq(0, 2.5, by = 0.1)
@@ -179,7 +249,7 @@ wd30.sigma <- sapply(X = sigmas, FUN = wd30.fun, mu = mle.wd30.norm[1], data = D
 plot(sigmas^2, wd30.sigma/max(wd30.sigma), col = 1, type = "l", xlab = expression(paste(sigma^2)),
      main = "Parameter value for var for normal model of wind direction")
 CI.wd30.sigma <- c(uniroot(f = CIfun.wd30, interval = c(0, mle.wd30.norm[2]), mu = F)$root,
-             uniroot(f = CIfun.wd30, interval = c(mle.wd30.norm[2], 2.5), mu = F)$root)
+                   uniroot(f = CIfun.wd30, interval = c(mle.wd30.norm[2], 2.5), mu = F)$root)
 CI.wd30.sigmasq <- CI.wd30.sigma^2
 lines(range(sigmas^2), c*c(1,1), col = 2)
 
@@ -201,4 +271,3 @@ round(rbind(CI.pow, wald.pow, mle.pow.exp, CI.ws30.shape, wald.ws30.shape,
             CI.wd30.sigmasq, wald.wd30.sigmasq, mle.wd30.norm.sq), digits=5)
 
 
-      
