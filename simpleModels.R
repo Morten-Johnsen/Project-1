@@ -75,6 +75,11 @@ par.ws30 <- nlminb(start = c(1,1), objective = testDistribution
             , distribution = "weibull"
             , lower = c(0,0))
 
+#mean(D$ws30)
+#par.ws30$par[2]*gamma(1+1/par.ws30$par[1]) #mean = lambda * Gamma(1 + 1/k); lambda = scale, k = shape
+alpha <- 0.05
+E.ws30 <- par.ws30$par[2]*gamma(1+1/par.ws30$par[1])
+CI.E.ws30 <- E.ws30 + c(-1,1) * qnorm(1-alpha/2) * sd(D$ws30) / dim(D)[1] #according to Central Limit Theorem
 
 ggplot(D)+
   geom_histogram(aes(x = ws30, y = ..count../sum(..count..))
@@ -82,6 +87,20 @@ ggplot(D)+
                  , bins = 30)+
   theme_bw()+
   stat_function(fun = dweibull, n = dim(D)[1], args = list(shape = par.ws30$par[1], scale = par.ws30$par[2]))
+
+# ggplot(D)+ #zoomed. Et forfærdeligt plot
+#   geom_histogram(aes(x = ws30, y = ..count../sum(..count..))
+#                  , colour = "white"
+#                  , bins = 30*3)+
+#   theme_bw()+
+#   stat_function(fun = dweibull, n = dim(D)[1], args = list(shape = par.ws30$par[1], scale = par.ws30$par[2]))+
+#   
+#   geom_vline(xintercept = CI.E.ws30[1], color = 'red', linetype = 'dashed')+
+#   geom_vline(xintercept = E.ws30), color = 'red')+
+#   geom_vline(xintercept = CI.E.ws30[2], color = 'red', linetype = 'dashed')+
+#   xlim(CI.E.ws30[1]-0.5, CI.E.ws30[2]+0.5)
+
+
 
 #### WIND DIRECTION ####
 #centrerer fordelingen omkring 3/2pi
@@ -99,9 +118,22 @@ ggplot(D)+
                      , labels =c("0", "pi/2", "pi", "3/2pi", "2pi"))+
   stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = par.wd30$par[1], sd = par.wd30$par[2]))
 
+CI.E.wd30 <- par.wd30$par[1] + c(-1,1) * qnorm(1-alpha/2) * sd(D$wd30) / dim(D)[1] #according to Central Limit Theorem
+
+# ggplot(D)+ #zoomed. Endnu et forfærdeligt plot
+#   geom_histogram(aes(x = ws30, y = ..count../sum(..count..))
+#                  , colour = "white"
+#                  , bins = 30)+
+#   theme_bw()+
+#   stat_function(fun = dweibull, n = dim(D)[1], args = list(shape = par.ws30$par[1], scale = par.ws30$par[2]))+
+#   
+#   geom_vline(xintercept = CI.E.wd30[1], color = 'red', linetype = 'dashed')+
+#   geom_vline(xintercept = par.wd30$par[1], color = 'red')+
+#   geom_vline(xintercept = CI.E.wd30[2], color = 'red', linetype = 'dashed')+
+#   xlim(CI.E.wd30[1]-0.5, CI.E.wd30[2]+0.5)
+
 ## CI ## WIND POWER
 par(mfrow=c(1,1))
-alpha <- 0.05
 c <- exp(-0.5 * qchisq(1-alpha, df = 1))
 #likelihood-based
 mle.pow.exp <- par$par
@@ -239,6 +271,7 @@ mle.wd30.norm.sq <- c(mle.wd30.norm[1], mle.wd30.norm[2]^2)
 round(rbind(CI.pow, wald.pow, mle.pow.exp, CI.ws30.shape, wald.ws30.shape,
             CI.ws30.scale, wald.ws30.scale,mle.ws30.weib, CI.wd30.mu, wald.wd30.mu,
             CI.wd30.sigmasq, wald.wd30.sigmasq, mle.wd30.norm.sq), digits=5)
-
+#The two CIs of population expected values as well as the expected values
+round(rbind(c(CI.E.ws30[1], E.ws30, CI.E.ws30[2]) , c(CI.E.wd30[1], mle.wd30.norm.sq[1], CI.E.wd30[2])), digits=5)
 
       
