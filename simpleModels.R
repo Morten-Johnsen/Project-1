@@ -9,7 +9,7 @@ library(numDeriv)
 #Retrieve data from the descriptive statistics script
 ##### TILPAS DEN HER TIL DEN COMPUTER DEER BRUGES
 if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
-  setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/Statistical Modelling/Project-1/")
+  setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
 } else {
   setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
 }
@@ -77,26 +77,46 @@ grid.arrange(grobs = BoxCoxPlot)
 
 #Compare distributions
 for (i in 1:10){
+  D$simdata <- rbeta(length(D$pow.obs.norm), shape1 = par.beta$par[1]
+        ,shape2 = par.beta$par[2])
   b <- ggplot(D)+
-    geom_histogram(aes(x = pow.obs.norm), colour = "white", alpha = 0.6)+
-    geom_histogram(aes(x = rbeta(length(pow.obs.norm), shape1 = par.beta$par[1]
-                                 ,shape2 = par.beta$par[2])), alpha = 0.2, fill = "blue")+
+    geom_histogram(aes(x = pow.obs.norm, y =..density..), colour = "white", alpha = 0.6)+
+    geom_histogram(aes(x = simdata, y =..density..), alpha = 0.2, fill = "blue")+
     theme_bw()+
+    ylim(c(0,10))+
     stat_function(fun = dbeta, n = length(D$pow.obs.norm), args = list(shape1 = par.beta$par[1],shape2 = par.beta$par[2]))
   show(b)
   Sys.sleep(2)
 }
 
-for (i in 1:10){
+for (i in 1:1){
+  D$simdata <- rexp(length(D$pow.obs.norm), rate = par.exp$par)
   g <- ggplot(D)+
     geom_histogram(aes(x = pow.obs.norm, y = ..density..))+
-    geom_histogram(aes(x = rexp(length(pow.obs.norm), rate = par.exp$par), y = ..density..)
+    geom_histogram(aes(x = simdata, y = ..density..)
                    , alpha = 0.2, fill = "blue")+
     theme_bw()+
     stat_function(fun = dexp, n = length(D$pow.obs.norm), args = list(rate = par.exp$par))
   show(g)
   Sys.sleep(2)
 }
+
+for (i in 1:1){
+  D$simdata <- rgamma(length(D$pow.obs.norm), shape = par.gamma$par[1], rate = par.gamma$par[2])
+  g <- ggplot(D)+
+    geom_histogram(aes(x = pow.obs.norm, y = ..density..))+
+    geom_histogram(aes(x = simdata, y = ..density..)
+                   , alpha = 0.2, fill = "blue")+
+    theme_bw()+
+    ylim(c(0,10))+
+    stat_function(fun = dgamma, n = length(D$pow.obs.norm), args = list(shape = par.gamma$par[1], rate = par.gamma$par[2]))
+  show(g)
+  Sys.sleep(2)
+}
+D <- D %>%
+  select(-simdata)
+#Det er tydeligvist beta modellen der er bedst. Det er også det der fremgår af likelihoods,
+#så alt er godt.
 
 #g.pow.obs
 #### WIND SPEED ####
@@ -113,7 +133,30 @@ ggplot(D)+
   theme_bw()+
   stat_function(fun = dweibull, n = dim(D)[1], args = list(shape = par.ws30$par[1], scale = par.ws30$par[2]))
 
+#Vi skal enten sammenligne med andre modeller eller referere til relevant litteratur
+#som siger at man bruger weibull tætheden og sådan er det.
+
 #### WIND DIRECTION ####
+library(circular)
+
+nll.wrappedNormal <- function(p,x){
+  nll <- -sum(log(dwrappednormal(x, mu = circular(p[1]), rho = NULL, sd = p[2])))
+  return(nll)
+}
+
+nll.wrappedCauchy <- function(p,x){
+  nll <- -sum(log(dwrappedcauchy(x, mu = circular(p))))
+  return(nll)
+}
+
+nll.vonMises <- function(p,x){
+  nll <- -sum(dvonmises(x, mu = circular(p[1]), kappa = p[2], log = T))
+  return(nll)
+}
+
+wrapped.par <- nlminb(start = c(2,1), objective = nll.wrappedNormal, x = D$wd30)
+wrapped.cauc.par <- nlminb(start = 1, objective = nll.wrappedCauchy, x = D$wd30)
+wrapped.vonMises <- nlminb(start = c(0,1), objective = nll.vonMises, x = D$wd30, lower = c(-1000, 0))
 #centrerer fordelingen omkring 3/2pi
 D$wd30.centered <- D$wd30 - pi/2; D$wd30.centered[D$wd30.centered < 0] = D$wd30.centered[D$wd30.centered < 0] + 2*pi
 par.wd30 <- nlminb(start = c(4,4),
@@ -123,11 +166,23 @@ par.wd30 <- nlminb(start = c(4,4),
 
 ggplot(D)+
   theme_bw()+
-  geom_density(aes(x = wd30.centered, y = ..density..), alpha = .8, colour = "white", fill = "red", colour = "white")+
-  geom_density(aes(x = wd30, y = ..density..), colour = "white", alpha = .2, fill = "blue")+
+  #geom_density(aes(x = wd30.centered, y = ..density..), alpha = .8, colour = "white", fill = "red", colour = "white")+
+  geom_histogram(aes(x = wd30, y = ..density..), colour = "white", alpha = .4, fill = "blue", bins = 20)+
   scale_x_continuous(breaks = c(0,pi/2,pi,3/2*pi,2*pi)
                      , labels =c("0", "pi/2", "pi", "3/2pi", "2pi"))+
-  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = par.wd30$par[1], sd = par.wd30$par[2]))
+  #stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = par.wd30$par[1], sd = par.wd30$par[2]))+
+  stat_function(fun = dwrappednormal, n = dim(D)[1], args = list(mu = wrapped.par$par[1], sd = wrapped.par$par[2]), aes(colour = "Wrapped Normal"))+
+  stat_function(fun = dwrappedcauchy, n = dim(D)[1], args = list(mu = wrapped.cauc.par$par), aes(colour = "Wrapped Cauchy"))+
+  stat_function(fun = dvonmises, n = dim(D)[1], args = list(mu = wrapped.vonMises$par[1], kappa = wrapped.vonMises$par[2]), aes(colour = "Von Mises"))+
+  labs(x = "Wind Direction", colour = "")+
+  scale_colour_manual(values = c("yellow", "red", "black"))
+
+#Calculate AICs
+print(paste0("AIC wrapped normal: ", round(-2*log(wrapped.par$objective)+2*2,4), "|"
+            ,"AIC wrapped cauchy: ", round(-2*log(wrapped.cauc.par$objective)+2,4), "|"
+            ,"AIC von Mises: "     , round(-2*log(wrapped.vonMises$objective)+2*2,4)))
+
+#Von mises er marginalt bedre end wrapped normal.
 
 ## CI ## WIND POWER
 par(mfrow=c(1,1))
