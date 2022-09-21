@@ -120,7 +120,7 @@ CI <- p.hat + c(-1,1)*qnorm(c(0.975))*sd/sqrt(sum(log.data$n))
 
 
 #calculate likelihood
-nll.p_0 <- function(beta, x, n){
+nll.p_0 <- function(beta, x = log.data$AIDS_yes[2], n = log.data$n[2]){
   p <- exp(beta)/(1+exp(beta))
   nll <- -sum(dbinom(x, size = n, prob = p, log = T))
   return(nll)
@@ -128,7 +128,7 @@ nll.p_0 <- function(beta, x, n){
 opt.p_0 <- nlminb(start = 1, objective = nll.p_0, x = log.data$AIDS_yes[2], n = log.data$n[2])
 beta_0 <- opt.p_0$par
 
-nll.p_1 <- function(beta_1, beta_0, x, n){
+nll.p_1 <- function(beta_1, beta_0, x = log.data$AIDS_yes[1], n = log.data$n[1]){
   p <- exp(beta_0+beta_1)/(1+exp(beta_0+beta_1))
   nll <- -sum(dbinom(x, size = n, prob = p, log = T))
 }
@@ -162,6 +162,7 @@ prof.b0 <- function(beta0, x, n){
   p <- exp(beta0)/(1+exp(beta0))
   return(-dbinom(x, size = n, prob = p, log = T))
 }
+
 prof.b1 <- function(beta1, beta0, x, n){
   p <- exp(beta0+beta1)/(1+exp(beta0+beta1))
   return(-dbinom(x, size = n, prob = p, log = T))
@@ -175,6 +176,7 @@ pL.b1 <- prof.b1(beta.one.sims
                  , x = log.data$AIDS_yes[1]
                  , n = log.data$n[1]
                  , beta0 = beta_0)
+par(mfrow=c(1,2))
 plot(beta.zero.sims
      , -(pL.b0+max(-pL.b0))
      , "l"
@@ -189,8 +191,46 @@ abline(h = -qchisq(0.95, df = 1)/2, lty = "dashed")
 #From these figures it can be concluded that the quadratic approximation
 #of the CI through use of fischers information matrix, is a 
 #good approksimation.
+#redefine because x is used
 
+sd_0 <- as.numeric(sqrt(solve(hessian(beta_0, func = nll.p_0))))
+sd_1 <- as.numeric(sqrt(solve(hessian(beta_1, func = nll.p_1, beta_0 = beta_0))))
 
+#Wald 95% CIs and profile-likelihoods with approx 95% CI
+(W.CI.0 <- beta_0 + c(-1,1)*qnorm(0.975)*sd_0)
+(W.CI.1 <- beta_1 + c(-1,1)*qnorm(0.975)*sd_1)
+
+#Direkte numerisk approksimation:
+(CI.0 <- c(min(beta.zero.sims[-(pL.b0+max(-pL.b0)) > -qchisq(0.95, df = 1)/2])
+         ,max(beta.zero.sims[-(pL.b0+max(-pL.b0)) > -qchisq(0.95, df = 1)/2])))
+(CI.1 <- c(min(beta.one.sims[-(pL.b1+max(-pL.b1)) > -qchisq(0.95, df = 1)/2])
+          ,max(beta.one.sims[-(pL.b1+max(-pL.b1)) > -qchisq(0.95, df = 1)/2])))
+
+plot(beta.zero.sims
+     , -(pL.b0+max(-pL.b0))
+     , "l"
+     ,main = "Profile likelihood for Beta 0"
+     ,xlab = expression(beta[0])
+     ,ylab = "lp - max(lp)")
+abline(h = -qchisq(0.95, df = 1)/2, col = 2)
+abline(v = c(W.CI.0), col = 6)
+text(x = W.CI.0[1]+0.2, y = -3, "Wald CI", col = 6)
+text(x = CI.0[1]+0.1, y = -2.5, "CI", col = 2)
+abline(v = c(CI.0), lty = "dashed", col = 2)
+plot(beta.one.sims
+     , -(pL.b1+max(-pL.b1))
+     , "l"
+     ,main = "Profile likelihood for beta 1"
+     ,xlab = expression(beta[1])
+     ,ylab = "lp - max(lp)")
+abline(h = -qchisq(0.95, df = 1)/2, col = 2)
+abline(v = c(W.CI.1), col = 6)
+text(x = W.CI.1[1]+0.2, y = -3, "Wald CI", col = 6)
+text(x = CI.1[1]+0.1, y = -2.5, "CI", col = 2)
+abline(v = c(CI.1),lty = "dashed", col = 2)
+
+# Hvordan kan man sige at de her værdier beskriver forskellen?
+#medmindre det på en eller anden måde skal være for p?
 
 #### Analysis of the Survival Data ####
 actg320 <- read.table("actg320.txt", header=TRUE, sep="", 
