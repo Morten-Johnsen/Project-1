@@ -229,8 +229,10 @@ text(x = W.CI.1[1]+0.2, y = -3, "Wald CI", col = 6)
 text(x = CI.1[1]+0.1, y = -2.5, "CI", col = 2)
 abline(v = c(CI.1),lty = "dashed", col = 2)
 
-# Hvordan kan man sige at de her værdier beskriver forskellen?
-#medmindre det på en eller anden måde skal være for p?
+#Hvordan kan man sige at de her værdier beskriver forskellen?
+#her er det tydeligt at beta_1 confint ikke krydser 0 og dermed kan det siges
+#at der er forskel på sandsynligheden for at få AIDS p_0 og p_1 blandt de to
+#grupper.
 
 #### Analysis of the Survival Data ####
 actg320 <- read.table("actg320.txt", header=TRUE, sep="", 
