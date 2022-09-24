@@ -68,6 +68,10 @@ ggplot(D)+
   theme_bw()+
   stat_function(fun = dexp, n = length(D$pow.obs.norm), args = list(rate = par$par))
 
+alpha <- 0.05
+#CI.E.pow.obs <- 1/par$par + c(-1,1) * qnorm(1-alpha/2) * sqrt(1/par$par^2) / dim(D)[1]
+CI.E.pow.obs <- mean(D$pow.obs.norm) + c(-1,1) * qnorm(1-alpha/2) * sd(D$pow.obs.norm) / dim(D)[1]
+
 #g.pow.obs
 #### WIND SPEED ####
 par.ws30 <- nlminb(start = c(1,1), objective = testDistribution
@@ -77,9 +81,10 @@ par.ws30 <- nlminb(start = c(1,1), objective = testDistribution
 
 #mean(D$ws30)
 #par.ws30$par[2]*gamma(1+1/par.ws30$par[1]) #mean = lambda * Gamma(1 + 1/k); lambda = scale, k = shape
-alpha <- 0.05
 E.ws30 <- par.ws30$par[2]*gamma(1+1/par.ws30$par[1])
-CI.E.ws30 <- E.ws30 + c(-1,1) * qnorm(1-alpha/2) * sd(D$ws30) / dim(D)[1] #according to Central Limit Theorem
+V.ws30 <- par.ws30$par[2]^2*( gamma(1+2/par.ws30$par[1]) - (gamma(1+1/par.ws30$par[1]))^2)
+#CI.E.ws30 <- E.ws30 + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30) / dim(D)[1] #according to Central Limit Theorem
+CI.E.ws30 <- mean(D$ws30) + c(-1,1) * qnorm(1-alpha/2) * sd(D$ws30) / dim(D)[1]
 
 ggplot(D)+
   geom_histogram(aes(x = ws30, y = ..count../sum(..count..))
@@ -101,7 +106,6 @@ ggplot(D)+
 #   xlim(CI.E.ws30[1]-0.5, CI.E.ws30[2]+0.5)
 
 
-
 #### WIND DIRECTION ####
 #centrerer fordelingen omkring 3/2pi
 D$wd30.centered <- D$wd30 - pi/2; D$wd30.centered[D$wd30.centered < 0] = D$wd30.centered[D$wd30.centered < 0] + 2*pi
@@ -118,7 +122,8 @@ ggplot(D)+
                      , labels =c("0", "pi/2", "pi", "3/2pi", "2pi"))+
   stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = par.wd30$par[1], sd = par.wd30$par[2]))
 
-CI.E.wd30 <- par.wd30$par[1] + c(-1,1) * qnorm(1-alpha/2) * sd(D$wd30) / dim(D)[1] #according to Central Limit Theorem
+#CI.E.wd30 <- par.wd30$par[1] + c(-1,1) * qnorm(1-alpha/2) * par.wd30$par[2] / dim(D)[1] #according to Central Limit Theorem
+CI.E.wd30 <- mean(D$wd30.centered) + c(-1,1) * qnorm(1-alpha/2) * sd(D$wd30.centered) / dim(D)[1]
 
 # ggplot(D)+ #zoomed. Endnu et forfærdeligt plot
 #   geom_histogram(aes(x = ws30, y = ..count../sum(..count..))
@@ -190,7 +195,7 @@ CIfun.ws30 <- function(y, shape = T){##### T for shape, F for scale
 }
 shapes <- seq(1, 3.5, by = 0.1)
 ws30.shape <- sapply(X = shapes, FUN = ws30.fun, scale = mle.ws30.weib[2], data = D$ws30)
-plot(shapes, ws30.shape/max(ws30.shape), col = 1, type = "l", xlab = "shape",
+plot(shapes, ws30.shape/max(ws30.shape), col = 1, type = "l", xlab = "shape, k",
      main = "Parameter value for shape for weibull model of wind speed")
 CI.ws30.shape <- c(uniroot(f = CIfun.ws30, interval = c(1, mle.ws30.weib[1]), shape = T)$root,
                 uniroot(f = CIfun.ws30, interval = c(mle.ws30.weib[1], 3.5), shape = T)$root)
@@ -198,7 +203,7 @@ lines(range(shapes), c*c(1,1), col = 2)
 
 scales <- seq(7, 12, by = 0.1)
 ws30.scale <- sapply(X = scales, FUN = ws30.fun, shape = mle.ws30.weib[1], data = D$ws30)
-plot(scales, ws30.scale/max(ws30.scale), col = 1, type = "l", xlab = "scale",
+plot(scales, ws30.scale/max(ws30.scale), col = 1, type = "l", xlab = expression(paste("scale, ", lambda)),
      main = "Parameter value for scale for weibull model of wind speed")
 CI.ws30.scale <- c(uniroot(f = CIfun.ws30, interval = c(7, mle.ws30.weib[2]), shape = F)$root,
                    uniroot(f = CIfun.ws30, interval = c(mle.ws30.weib[2], 12), shape = F)$root)
@@ -272,6 +277,6 @@ round(rbind(CI.pow, wald.pow, mle.pow.exp, CI.ws30.shape, wald.ws30.shape,
             CI.ws30.scale, wald.ws30.scale,mle.ws30.weib, CI.wd30.mu, wald.wd30.mu,
             CI.wd30.sigmasq, wald.wd30.sigmasq, mle.wd30.norm.sq), digits=5)
 #The two CIs of population expected values as well as the expected values
-round(rbind(c(CI.E.ws30[1], E.ws30, CI.E.ws30[2]) , c(CI.E.wd30[1], mle.wd30.norm.sq[1], CI.E.wd30[2])), digits=5)
+round(rbind(c(CI.E.pow.obs[1], 1/par$par, CI.E.pow.obs[2]) , c(CI.E.ws30[1], E.ws30, CI.E.ws30[2]) , c(CI.E.wd30[1], mle.wd30.norm.sq[1], CI.E.wd30[2])), digits=5)
 
       
