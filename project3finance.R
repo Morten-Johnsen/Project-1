@@ -8,6 +8,7 @@ library(PowerNormal)
 library(sn)
 library(gnorm)
 library(emg)
+setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
 setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1")
 D <- read.table("finance_data.csv", header=TRUE, sep=";", 
                 as.is=TRUE)
@@ -94,20 +95,20 @@ qqline(D$SLV)
 lcauchyFUNC <- function(p, data){
   x0 <- p[1] #location R
   gam <- p[2] #scale R > 0
-  -sum(dcauchy(x = data, location = x0, scale = gam, log = T))
+  return(-sum(dcauchy(x = data, location = x0, scale = gam, log = T)))
 }
 lpownormFUNC <- function(p, data){
   alpha <- p
-  -sum(log(dpn(x = D$SLV, p)))
+  return(-sum(log(dpn(x = D$SLV, p))))
 }
 ltFUNC <- function(p, data){
-  -sum(dt(x = data, df = p, log = T))
+  return(-sum(dt(x = data, df = p, log = T)))
 }
 lsnFUNC <- function(p, data){ #skewed normal dist
-  -sum(dsn(x = data, omega = p[1], alpha = p[2], tau = p[3], log = T))
+  return(-sum(dsn(x = data, omega = p[1], alpha = p[2], tau = p[3], log = T)))
 }
 lgnFUNC <- function(p, data){ #symmetric generalized normal dist
-  -sum(dgnorm(x = data, mu = p[1], alpha = p[2], beta = p[3], log = T))
+  return(-sum(dgnorm(x = data, mu = p[1], alpha = p[2], beta = p[3], log = T)))
 }
 # lgnFUNC <- function(p, data){
 #   mu <- p[1]
@@ -119,12 +120,12 @@ lasgnFUNC <- function(p, data){ #asymmetric generalized normal dist, when K = 0 
   epsilon <- p[1]
   alpha <- p[2]
   kappa <- p[3]
-  -sum( log(dnorm(x = -1/kappa * log(1 - kappa * (data - epsilon) / alpha) ) /
-              (alpha - kappa * (data - epsilon)) ) )
+  return(-sum( log(dnorm(x = -1/kappa * log(1 - kappa * (data - epsilon) / alpha) ) /
+              (alpha - kappa * (data - epsilon)) ) ) )
 }
 
 lemgFUNC <- function(p, data){ #exponential modified gaussian dist
-  -sum(demg(x = data, mu = p[1], sigma = p[2], lambda = p[3], log = T))
+  return(-sum(demg(x = data, mu = p[1], sigma = p[2], lambda = p[3], log = T)))
 }
 
 par.cauchy <- nlminb(start = c(0,1), objective = lcauchyFUNC, data = D$SLV)
@@ -137,17 +138,19 @@ par.emg <- nlminb(start = c(1,1,1), lower = c(-Inf, 1/1000, 1/1000), objective =
 
 ggplot(D)+
   geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
-  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = par$par[1], sd = par$par[2]), color='red') +
+  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = par$par[1], sd = par$par[2]), aes(colour = "norm")) +
   stat_function(fun = dcauchy, n = dim(D)[1], args = list(location = par.cauchy$par[1],
-                                                          scale = par.cauchy$par[2]), color='blue') +
-  stat_function(fun = dpn, n = dim(D)[1], args = list(alpha = par.pownorm$par), color = 'green') +
-  stat_function(fun = dt, n = dim(D)[1], args = list(df = par.t$par), color='yellow') +
-  stat_function(fun = dsn, n = dim(D)[1], args = list(omega = par.sn$par[1], alpha = par.sn$par[2],
-                                                      tau = par.sn$par[3]), color='purple') +
+                                                          scale = par.cauchy$par[2]), aes(colour = "cauchy")) +
+  stat_function(fun = dpn, n = dim(D)[1], args = list(alpha = par.pownorm$par), aes(colour = "powernorm")) +
+  stat_function(fun = dt, n = dim(D)[1], args = list(df = par.t$par), aes(colour = "t")) +
+  #stat_function(fun = dsn, n = dim(D)[1], args = list(omega = par.sn$par[1], alpha = par.sn$par[2],
+                                                      #tau = par.sn$par[3]), aes(colour = "sn")) +
   stat_function(fun = dgnorm, n = dim(D)[1], args = list(mu = par.gn$par[1], alpha = par.gn$par[2],
-                                                         beta = par.gn$par[3]), color='orange') +
+                                                         beta = par.gn$par[3]), aes(colour = "gnorm")) +
   stat_function(fun = demg, n = dim(D)[1], args = list(mu = par.emg$par[1], sigma = par.emg$par[2],
-                                                       lambda = par.emg$par[3]), color = 'pink')
+                                                       lambda = par.emg$par[3]), aes(colour = "emg"))+
+  scale_colour_manual(values = c("blue", "red", "yellow", "black", "pink", "grey", "purple"))+
+  labs(colour = "Distribution")
 #legend('topright', legend=c('normal', 'cauchy', 'power normal', 't'), col=c('red', 'blue', 'green', 'yellow'))
 
 AIC.norm <- -2 * sum(dnorm(x = D$SLV, mean = par$par[1], sd = par$par[2], log = T))
