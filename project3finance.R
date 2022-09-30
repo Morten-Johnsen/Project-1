@@ -8,7 +8,7 @@ library(PowerNormal)
 library(sn)
 library(gnorm)
 library(emg)
-setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
+#setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
 setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1")
 D <- read.table("finance_data.csv", header=TRUE, sep=";", 
                 as.is=TRUE)
@@ -99,7 +99,7 @@ lcauchyFUNC <- function(p, data){
 }
 lpownormFUNC <- function(p, data){
   alpha <- p
-  return(-sum(log(dpn(x = D$SLV, p))))
+  return(-sum(log(dpn(x = data, p))))
 }
 ltFUNC <- function(p, data){
   return(-sum(dt(x = data, df = p, log = T)))
@@ -186,4 +186,31 @@ round(rbind(AIC.norm, AIC.cauchy, AIC.pownorm, AIC.t, AIC.sn, AIC.gn, AIC.asgn, 
 #   #geom_histogram(aes(x = rgnorm(dim(D)[1], mu = par.gn$par[1], alpha = par.gn$par[2], beta = par.gn$par[3]), y=..density..), color='black') +
 #   geom_histogram(aes(x = SLV, y= ..density..,), color='red') + #color, fill
 #   geom_histogram(aes(x = rgnorm(dim(D)[1], mu = par.gn$par[1], alpha = par.gn$par[2], beta = par.gn$par[3]), y=..density..), color='black')
-#   
+lgamFUNC <- function(p, norm_data){
+  k <- p[1] #shape
+  beta <- p[2] # rate
+  return(-sum(dgamma(x = norm_data, shape = k, rate = beta, log = T)))
+}
+lbetaFUNC <- function(p, norm_data){
+  alpha <- p[1] #shape
+  beta <- p[2] #¿shape?
+  -sum(dbeta(x = norm_data, shape1 = alpha, shape2 = beta, log = T))
+}
+
+D$SLV.norm <- ( D$SLV - min(D$SLV) ) / (max(D$SLV) - min(D$SLV))
+par.gam <- nlminb(start = c(0.5, 0.5), objective = lgamFUNC, norm_data = D$SLV.norm)
+par.beta <- nlminb(start = c(0.5, 0.5), objective = lbetaFUNC, norm_data = D$SLV.norm)
+par.gn.norm <- nlminb(start = c(1,1,1), objective = lgnFUNC, data = D$SLV.norm)
+
+ggplot(D)+
+  geom_histogram(aes(x = SLV.norm, y= ..density..,), color='black') + 
+  stat_function(fun = dgamma, n = dim(D)[1], args = list(shape = par.gam$par[1], scale = par.gam$par[2]), aes(colour = 'gamma')) +
+  stat_function(fun = dbeta, n = dim(D)[1], args = list(shape1 = par.beta$par[1], shape2 = par.beta$par[2]), aes(colour = 'beta')) +
+  stat_function(fun = dgnorm, n = dim(D)[1], args = list(mu = par.gn.norm$par[1],
+      alpha = par.gn.norm$par[2], beta = par.gn.norm$par[3]), aes(colour='gnorm')) +
+  labs(colour = 'Distributions')
+
+-2 * sum(dgamma(x=D$SLV.norm, shape = par.gam$par[1], rate = par.gam$par[2], log = T)) + 2 * length(par.gam$par)
+-2 * sum(dbeta(x=D$SLV.norm, shape1 = par.beta$par[1], shape2 = par.beta$par[2], log = T)) + 2 * length(par.beta$par)
+-2 * sum(dgnorm(x = D$SLV.norm, mu = par.gn.norm$par[1], alpha = par.gn.norm$par[2],
+                beta = par.gn.norm$par[3], log = T)) + 2 * length(par.gn.norm$par)
