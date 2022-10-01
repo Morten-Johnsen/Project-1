@@ -1,0 +1,60 @@
+---
+title: "Assignment 1"
+author: "Johnsen"
+date: "2022-10-01"
+output: pdf_document
+---
+
+## Projekt 1: Wind Power Forecast
+
+### Descriptive Statistics
+
+#### Read the data tuno.txt into R
+
+#### Make a graphical presentation of data or parts of the data, and present some summary statistics.
+
+### Simple Models
+
+#### Fit different probability density models to wind power, wind speed and wind direction data. You might consider different models e.g. beta, gamma, log normal, and different transformations e.g. (for wind power). It is important that you consider if the distributions/transformations are reasonable for the data that you try to model.
+
+#### Conclude on the most appropriate model for each variable, also report parameters including assessment of their uncertainty. For models that does not include a transformation you should also give an assessment of the uncertainty of the expected value in the model.
+
+
+## Projekt 2: Survival Data
+
+### Analysis of the Binary Data
+
+#### Read the data Logistic.txt into R.
+
+#### Fit the Binomial distribution to the data (i.e. consider all data as com-
+ing from the same population)
+
+#### Fit the Binomial separately to the two distributions and test if there is a difference between the groups.
+
+#### Estimate parameters in the model (p0 probability of AIDS in control group, p1 probability of AIDS in treatment group) and report a confidence interval for the parameter describing the difference, compare with the result above.
+
+### Analysis of the Survival Time Data
+
+#### Read the data actg320.txt into R. If you are using RStudio you can use the "Import Dataset" button.
+
+#### How many patients got AIDS or died in the two treatment groups? What is the proportion of patients that got AIDS or died in the two group? Other relevant number that could be calculated?
+
+#### Fit an exponential distribution, using numerical methods, to the time of event (time) in the data set, remember to take into account that some of the data is censored (i.e. we only know that the time to the event is longer that the reported time). 1: Using all data (i.e. ignore the treatment effect) 2: Separately for the two treatments
+
+#### Compared the likelihood for the above models and conclude
+
+#### Formulate a model where one parameter indicate the treatment effect (e.g. E[T] = $e^\beta_0$ if control group and E[T] = $e^{\beta_0 + \beta_1} if treatment group), find the MLE and compare with the result above.
+
+#### Find the Wald confidence interval for the treatment parameter in the model above.
+
+#### Derive the theoretical results for the models above, including the stan- dard error estimates, use this to formulate and implement the profile likelihood function for the treatment parameter
+
+## Projekt 3: Financial Data
+
+### Descriptive Statistics and Simple Models
+
+#### Present the data, estimate the parameters in a normal model, and asses if the normal model is appropriate.
+
+#### Hypothesize a model that could fit the data better (Hint: consider tail probabilities), and compare with the normal model estimated above
+
+#### Present the final model (i.e. relevant keynumbers for the estimates)
