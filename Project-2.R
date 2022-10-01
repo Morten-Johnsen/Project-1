@@ -118,7 +118,6 @@ CI <- p.hat + c(-1,1)*qnorm(c(0.975))*sd/sqrt(sum(log.data$n))
 #p_0: Probability of aids in control group
 #p_1: Probability of aids in treatment group
 
-
 #calculate likelihood
 nll.p_0 <- function(beta, x = log.data$AIDS_yes[2], n = log.data$n[2]){
   p <- exp(beta)/(1+exp(beta))
@@ -182,13 +181,6 @@ plot(beta.one.sims
      ,main = "Profile likelihood for Beta_1")
 abline(h = -qchisq(0.95, df = 1)/2, lty = "dashed")
 
-library(sen)
-plot(confint(fit.glm, Log = T, fig = T))
-pr <- profile(fit.glm)
-plot(pr$AZT$par.vals[,2], pr$AZT$z)
-abline(h = 0.5*qchisq(0.95, df = 1))
-abline(h = -0.5*qchisq(0.95, df = 1))
-abline(v = c(CI.1),lty = "dashed", col = 2)
 #From these figures it can be concluded that the quadratic approximation
 #of the CI through use of fischers information matrix, is a 
 #good approksimation.
@@ -329,8 +321,8 @@ abline(lm(actg_event$time ~ theoretical))
 
 
 #### bullet point 5: Model with a parameter indicating the treatment effect. ####
-#library(survival)
-#library(survminer)
+library(survival)
+library(survminer)
 kaplan.meier <- survfit(Surv(time, event) ~ tx, data = actg)
 ggsurvplot_add_all(kaplan.meier
                    , data = actg
