@@ -9,7 +9,7 @@ library(sn)
 library(gnorm)
 library(emg)
 #setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
-setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1")
+setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
 D <- read.table("finance_data.csv", header=TRUE, sep=";", 
                 as.is=TRUE)
 ## Dimensions of D (number of rows and columns)
@@ -37,7 +37,7 @@ ggplot(D, aes(x = SLV)) +
 
 #########################################################################################################
 #########################################################################################################
-source('testDistribution.R')
+source("testDistribution.R")
 #########################################################################################################
 #########################################################################################################
 par <- nlminb(start = c(1,1), objective = testDistribution,
@@ -68,7 +68,7 @@ ltFUNC <- function(p, data){
   return(-sum(dt(x = data, df = p, log = T)))
 }
 lsnFUNC <- function(p, data){ #skewed normal dist
-  return(-sum(dsn(x = data, omega = p[1], alpha = p[2], tau = p[3], log = T)))
+  return(-sum(dsn(x = data, xi = p[1], omega = p[2], alpha = p[3], log = T)))
 }
 lgnFUNC <- function(p, data){ #symmetric generalized normal dist
   return(-sum(dgnorm(x = data, mu = p[1], alpha = p[2], beta = p[3], log = T)))
@@ -106,8 +106,8 @@ ggplot(D)+
                                                           scale = par.cauchy$par[2]), aes(colour = "cauchy")) +
   stat_function(fun = dpn, n = dim(D)[1], args = list(alpha = par.pownorm$par), aes(colour = "powernorm")) +
   stat_function(fun = dt, n = dim(D)[1], args = list(df = par.t$par), aes(colour = "t")) +
-  stat_function(fun = dsn, n = dim(D)[1], args = list(omega = par.sn$par[1], alpha = par.sn$par[2],
-                                                      tau = par.sn$par[3]), aes(colour = "sn")) +
+  stat_function(fun = dsn, n = dim(D)[1], args = list(xi = par.sn$par[1], omega = par.sn$par[2],
+                                                      alpha = par.sn$par[3]), aes(colour = "sn")) +
   stat_function(fun = dgnorm, n = dim(D)[1], args = list(mu = par.gn$par[1], alpha = par.gn$par[2],
                                                          beta = par.gn$par[3]), aes(colour = "gnorm")) +
   stat_function(fun = demg, n = dim(D)[1], args = list(mu = par.emg$par[1], sigma = par.emg$par[2],
@@ -123,7 +123,7 @@ AIC.cauchy <- -2 * sum(dcauchy(x = D$SLV, location = par.cauchy$par[1],
 AIC.pownorm <- -2 * sum(log(dpn(x = D$SLV, alpha = par.pownorm$par)))
 + 2 * length(par.pownorm$par)
 AIC.t <- -2 * sum(dt(x=D$SLV, df = par.t$par, log = T)) + 2 * length(par.t$par)
-AIC.sn <- -2 * sum(dsn(x=D$SLV, omega = par.sn$par[1], alpha = par.sn$par[2], tau = par.sn$par[3], 
+AIC.sn <- -2 * sum(dsn(x=D$SLV, xi = par.sn$par[1], omega = par.sn$par[2], alpha = par.sn$par[3], 
                        log = T)) + 2 * length(par.sn$par)
 AIC.gn <- -2 * sum(dgnorm(x=D$SLV, mu = par.gn$par[1], alpha = par.gn$par[2], beta = par.gn$par[3], 
                           log = T)) + 2 * length(par.gn$par)
@@ -140,7 +140,7 @@ n <- 100000
 par(mfrow=c(2,3))
 hist(rnorm(n, mean = par$par[1], sd = par$par[2]))
 hist(D$SLV)
-hist(rsn(n, omega = par.sn$par[1], alpha = par.sn$par[2], tau = par.sn$par[3]))
+hist(rsn(n, xi = par.sn$par[1], omega = par.sn$par[2], alpha = par.sn$par[3]))
 hist(rgnorm(n, mu = par.gn$par[1], alpha = par.gn$par[2], beta = par.gn$par[3]))
 hist(rcauchy(n, location = par.cauchy$par[1], scale = par.cauchy$par[2]))
 hist(remg(n, mu = par.emg$par[1], sigma = par.emg$par[2], lambda = par.emg$par[3]))
@@ -177,3 +177,14 @@ ggplot(D)+
 -2 * sum(dbeta(x=D$SLV.norm, shape1 = par.beta$par[1], shape2 = par.beta$par[2], log = T)) + 2 * length(par.beta$par)
 -2 * sum(dgnorm(x = D$SLV.norm, mu = par.gn.norm$par[1], alpha = par.gn.norm$par[2],
                 beta = par.gn.norm$par[3], log = T)) + 2 * length(par.gn.norm$par)
+
+par(mfrow=c(1,3))
+plot(ecdf(D$SLV), verticals = T)
+xseq <- seq(0.9*min(D$SLV), 1.1*max(D$SLV), length.out=100)
+#lines(xseq, pnorm(xseq, mean(D$SLV), sd(D$SLV)), col='red')
+lines(xseq, pnorm(xseq, mean = par$par[1], sd = par$par[2]), col='blue')
+plot(ecdf(D$SLV), verticals = T)
+lines(xseq, pgnorm(xseq, mu = par.gn$par[1], alpha = par.gn$par[2], beta = par.gn$par[3]), col='green')
+plot(ecdf(D$SLV), verticals = T)
+lines(xseq, psn(xseq, xi = par.sn$par[1], omega = par.sn$par[2], alpha = par.sn$par[3]), col='red')
+
