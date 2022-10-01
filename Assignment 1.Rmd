@@ -259,15 +259,16 @@ ggplot(D)+
                      , labels =c("0", "pi/2", "pi", "3/2pi", "2pi"))+
   #stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = par.wd30$par[1], sd = par.wd30$par[2]))+
   stat_function(fun = dwrappednormal, n = dim(D)[1], args = list(mu = wrapped.par$par[1], sd = wrapped.par$par[2]), aes(colour = "Wrapped Normal"))+
-  stat_function(fun = dwrappedcauchy, n = dim(D)[1], args = list(mu = wrapped.cauc.par$par[1], rho = 0.36), aes(colour = "Wrapped Cauchy"))+
+  stat_function(fun = dwrappedCauchy, n = dim(D)[1], args = list(mu = wrapped.cauc.par$par[1],rho = wrapped.cauc.par$par[2]), aes(colour = "Wrapped Cauchy"))+
+  #stat_function(fun = dwrappedcauchy, n = dim(D)[1], args = list(mu = -1.5748695, rho = 0.2751607), aes(colour = "Wrapped Cauchy2"))+
   stat_function(fun = dvonmises, n = dim(D)[1], args = list(mu = wrapped.vonMises$par[1], kappa = wrapped.vonMises$par[2]), aes(colour = "Von Mises"))+
   labs(x = "Wind Direction", colour = "")+
-  scale_colour_manual(values = c("yellow", "red", "black"))
+  scale_colour_manual(values = c("yellow", "red", "black", "blue"))
 
 #Calculate AICs
-print(paste0("AIC wrapped normal: ", round(-2*log(wrapped.par$objective)+2*2,4), "|"
-            ,"AIC wrapped cauchy: ", round(-2*log(wrapped.cauc.par$objective)+2,4), "|"
-            ,"AIC von Mises: "     , round(-2*log(wrapped.vonMises$objective)+2*2,4)))
+print(paste0("AIC wrapped normal: ", round(-2*log(exp(-wrapped.par$objective     ))+2*2,4), "|"
+            ,"AIC wrapped cauchy: ", round(-2*log(exp(-wrapped.cauc.par$objective))+2*2,4), "|"
+            ,"AIC von Mises: "     , round(-2*log(exp(-wrapped.vonMises$objective))+2*2,4)))
 ```
 
 
@@ -432,15 +433,27 @@ round( rbind( CI.pow1, wald.pow.shape1, CI.pow2, wald.pow.shape2, mle.pow,
               CI.ws30.shape, wald.ws30.shape, CI.ws30.scale, wald.ws30.scale, mle.ws30.weib, 
               CI.wd30.mu, wald.wd30.mu, CI.wd30.rho, wald.wd30.rho, mle.wd30 ), digits = 3 )
 
-#CI.E.pow.obs <- 1/par$par + c(-1,1) * qnorm(1-alpha/2) * sqrt(1/par$par^2) / dim(D)[1]
-CI.E.pow.obs <- mean(D$pow.obs.norm) + c(-1,1) * qnorm(1-alpha/2) * sd(D$pow.obs.norm) / dim(D)[1]
+alpha <- par.beta$par[1]; beta <- par.beta$par[2]
+#Beta: E[X] = alpha/(alpha + beta), Var[X] = alpha*beta/((alpha+beta)^2*(alpha+beta+1))
+E.pow.obs <- alpha/(alpha + beta)
+CI.E.pow.obs <- alpha/(alpha + beta) + c(-1,1) * qnorm(1-alpha/2) * alpha*beta/((alpha+beta)^2*(alpha+beta+1)) * 1/dim(D)[1]
+#(CI.E.pow.obs <- mean(D$pow.obs.norm) + c(-1,1) * qnorm(1-alpha/2) * sd(D$pow.obs.norm) / dim(D)[1])
+
+#Weibull: E[X] = lambda * gamma(1+1/k); Var[X] = lambda^2*(gamma(1+2/k) - (gamma(1+1/k))^2)
 #par.ws30$par[2]*gamma(1+1/par.ws30$par[1]) #mean = lambda * Gamma(1 + 1/k); lambda = scale, k = shape
-E.ws30 <- par.ws30$par[2]*gamma(1+1/par.ws30$par[1])
-V.ws30 <- par.ws30$par[2]^2*( gamma(1+2/par.ws30$par[1]) - (gamma(1+1/par.ws30$par[1]))^2)
-#CI.E.ws30 <- E.ws30 + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30) / dim(D)[1] #according to Central Limit Theorem
-CI.E.ws30 <- mean(D$ws30) + c(-1,1) * qnorm(1-alpha/2) * sd(D$ws30) / dim(D)[1]
-#CI.E.wd30 <- par.wd30$par[1] + c(-1,1) * qnorm(1-alpha/2) * par.wd30$par[2] / dim(D)[1] #according to Central Limit Theorem
-CI.E.wd30 <- mle.wd30[1] + c(-1,1) * qnorm(1-alpha/2) * sd(D$wd30) / dim(D)[1] #mean(D$wd30) instead gives another result
+scale <- par.ws30$par[2]; shape <- par.ws30$par[1]
+E.ws30 <- scale*gamma(1+1/shape)
+V.ws30 <- scale^2*(gamma(1+2/shape) - (gamma(1+1/shape))^2)
+CI.E.ws30 <- E.ws30 + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30) / dim(D)[1] #according to Central Limit Theorem
+#(CI.E.ws30 <- mean(D$ws30) + c(-1,1) * qnorm(1-alpha/2) * sd(D$ws30) / dim(D)[1])
+
+#Wrapped Cauchy: E[X] = mu, Var[X] = 1 - exp(-gamma)
+#relationship between rho and gamma: gamma = -ln(rho)
+mu <- wrapped.cauc.par$par[1]; gamma = -log(wrapped.cauc.par$par[2])
+(E.wd30 <- mu)
+(V.wd30 <- 1 - exp(-gamma)) #or 1 - rho
+(CI.E.wd30 <- E.wd30 + c(-1,1) * qnorm(1-alpha/2) *V.wd30 / dim(D)[1]) #according to Central Limit Theorem
+#(CI.E.wd30 <- mle.wd30[1] + c(-1,1) * qnorm(1-alpha/2) * sd(D$wd30) / dim(D)[1]) #mean(D$wd30) instead gives another result
 
 round(rbind(c(CI.E.pow.obs[1], 1/par.exp$par, CI.E.pow.obs[2]) , c(CI.E.ws30[1], E.ws30, CI.E.ws30[2]) , c(CI.E.wd30[1], mle.wd30[1], CI.E.wd30[2])), digits=5)
 ```
