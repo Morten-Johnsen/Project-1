@@ -2,7 +2,9 @@
 title: "Assignment 1"
 author: "Johnsen"
 date: "2022-10-01"
-output: pdf_document
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r, include = F}
@@ -23,6 +25,7 @@ library(gnorm)
 library(emg)
 library(survival)
 library(survminer)
+library(circular)
 
 if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
   setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
@@ -229,8 +232,6 @@ ggplot(D)+
 
 Wind direction are supplied as radians in the dataset, and thus it is appropriate to fit circular distributions to this variable. Here we examine a circular normal distribution, wrapped cauchy and a von Mises distribution.
 ```{r}
-library(circular)
-
 nll.wrappedNormal <- function(p,x){
   nll <- -sum(log(dwrappednormal(x, mu = circular(p[1]), rho = NULL, sd = p[2])))
   return(nll)
@@ -259,7 +260,7 @@ ggplot(D)+
                      , labels =c("0", "pi/2", "pi", "3/2pi", "2pi"))+
   #stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = par.wd30$par[1], sd = par.wd30$par[2]))+
   stat_function(fun = dwrappednormal, n = dim(D)[1], args = list(mu = wrapped.par$par[1], sd = wrapped.par$par[2]), aes(colour = "Wrapped Normal"))+
-  stat_function(fun = dwrappedCauchy, n = dim(D)[1], args = list(mu = wrapped.cauc.par$par[1],rho = wrapped.cauc.par$par[2]), aes(colour = "Wrapped Cauchy"))+
+  stat_function(fun = dwrappedcauchy, n = dim(D)[1], args = list(mu = wrapped.cauc.par$par[1],rho = wrapped.cauc.par$par[2]), aes(colour = "Wrapped Cauchy"))+
   #stat_function(fun = dwrappedcauchy, n = dim(D)[1], args = list(mu = -1.5748695, rho = 0.2751607), aes(colour = "Wrapped Cauchy2"))+
   stat_function(fun = dvonmises, n = dim(D)[1], args = list(mu = wrapped.vonMises$par[1], kappa = wrapped.vonMises$par[2]), aes(colour = "Von Mises"))+
   labs(x = "Wind Direction", colour = "")+
