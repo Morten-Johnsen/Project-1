@@ -41,38 +41,38 @@ par.gamma$objective
 #Box-Cox transformation of pow.obs.norm
 #Examine different transformations and the achieved fit when fitting a normal
 #distribution
-
-lambda <- c(0.0, 0.05, 0.10, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4)
-pal <- palette.colors(length(lambda))
-BoxCoxPlot <- list()
-for (i in 1:length(lambda)){
-  xData <- 2*log(D$pow.obs.norm^lambda[i]/(1-D$pow.obs.norm)^(1-lambda[i]))
-  n <- nlminb(start = c(-1,1)
-              , objective = testDistribution
-              , x = xData
-              , distribution = "normal")
-  
-  simData <- rnorm(n = length(D$pow.obs.norm), mean = n$par[1], sd = n$par[2])
-  D$sim <- simData
-  
-  print(c(n$par, lambda[i], mean(D$sim), sd(D$sim)))
-  BoxCoxPlot[[paste0(lambda[i])]] <- ggplot(D)+
-    geom_histogram(aes(x = sim, y = ..density..)
-                   , colour = "white"
-                   , alpha = 0.5
-                   , fill = "black")+
-    geom_histogram(aes(x = 2*log(pow.obs.norm^lambda[i]/(1-pow.obs.norm)^(1-lambda[i])), y = ..density..)
-                   , colour = "white"
-                   , alpha = 0.6
-                   , fill = pal[[i]])+
-    labs(x = "BoxCox(pow.obs.norm)")+
-    ggtitle(paste0("BoxCox Transformation of Windpower, ", expression(lambda), " = ", lambda[i]))+
-    geom_text(x = -5, y = 0.23, label = paste0("NLL = ", round(n$objective,2)))+
-    geom_text(x = -5, y = 0.2, label = paste0("(mean, sd) = (", round(n$par[1],2), ",", round(n$par[2],2), ")"))+
-    stat_function(fun = dnorm, n = length(D$pow.obs.norm), args = list(mean = n$par[1], sd = n$par[2]), alpha = 0.6, colour = "black")
-}
-library(gridExtra)
-grid.arrange(grobs = BoxCoxPlot)
+# 
+# lambda <- c(0.0, 0.05, 0.10, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4)
+# pal <- palette.colors(length(lambda))
+# BoxCoxPlot <- list()
+# for (i in 1:length(lambda)){
+#   xData <- 2*log(D$pow.obs.norm^lambda[i]/(1-D$pow.obs.norm)^(1-lambda[i]))
+#   n <- nlminb(start = c(-1,1)
+#               , objective = testDistribution
+#               , x = xData
+#               , distribution = "normal")
+#   
+#   simData <- rnorm(n = length(D$pow.obs.norm), mean = n$par[1], sd = n$par[2])
+#   D$sim <- simData
+#   
+#   print(c(n$par, lambda[i], mean(D$sim), sd(D$sim)))
+#   BoxCoxPlot[[paste0(lambda[i])]] <- ggplot(D)+
+#     geom_histogram(aes(x = sim, y = ..density..)
+#                    , colour = "white"
+#                    , alpha = 0.5
+#                    , fill = "black")+
+#     geom_histogram(aes(x = 2*log(pow.obs.norm^lambda[i]/(1-pow.obs.norm)^(1-lambda[i])), y = ..density..)
+#                    , colour = "white"
+#                    , alpha = 0.6
+#                    , fill = pal[[i]])+
+#     labs(x = "BoxCox(pow.obs.norm)")+
+#     ggtitle(paste0("BoxCox Transformation of Windpower, ", expression(lambda), " = ", lambda[i]))+
+#     geom_text(x = -5, y = 0.23, label = paste0("NLL = ", round(n$objective,2)))+
+#     geom_text(x = -5, y = 0.2, label = paste0("(mean, sd) = (", round(n$par[1],2), ",", round(n$par[2],2), ")"))+
+#     stat_function(fun = dnorm, n = length(D$pow.obs.norm), args = list(mean = n$par[1], sd = n$par[2]), alpha = 0.6, colour = "black")
+# }
+# library(gridExtra)
+# grid.arrange(grobs = BoxCoxPlot)
 
 
 #Compare distributions
@@ -86,7 +86,7 @@ for (i in 1:1){
     ylim(c(0,10))+
     stat_function(fun = dbeta, n = length(D$pow.obs.norm), args = list(shape1 = par.beta$par[1],shape2 = par.beta$par[2]))
   show(b)
-  Sys.sleep(2)
+  #Sys.sleep(2)
 }
 
 for (i in 1:1){
@@ -98,7 +98,7 @@ for (i in 1:1){
     theme_bw()+
     stat_function(fun = dexp, n = length(D$pow.obs.norm), args = list(rate = par.exp$par))
   show(g)
-  Sys.sleep(2)
+  #Sys.sleep(2)
 }
 
 for (i in 1:1){
@@ -111,7 +111,7 @@ for (i in 1:1){
     ylim(c(0,10))+
     stat_function(fun = dgamma, n = length(D$pow.obs.norm), args = list(shape = par.gamma$par[1], rate = par.gamma$par[2]))
   show(g)
-  Sys.sleep(2)
+  #Sys.sleep(2)
 }
 D <- D %>%
   select(-simdata)
@@ -145,7 +145,7 @@ nll.wrappedNormal <- function(p,x){
 }
 
 nll.wrappedCauchy <- function(p,x){
-  nll <- -sum(log(dwrappedcauchy(x, mu = circular(p))))
+  nll <- -sum(log(dwrappedcauchy(x, mu = circular(p[1]), rho = p[2])))
   return(nll)
 }
 
@@ -155,7 +155,8 @@ nll.vonMises <- function(p,x){
 }
 
 wrapped.par <- nlminb(start = c(2,1), objective = nll.wrappedNormal, x = D$wd30)
-wrapped.cauc.par <- nlminb(start = 1, objective = nll.wrappedCauchy, x = D$wd30)
+wrapped.cauc.par <- nlminb(start = c(1,1/10000), lower = c(-Inf, 1/10000), upper = c(Inf, 1),
+                           objective = nll.wrappedCauchy, x = D$wd30)
 wrapped.vonMises <- nlminb(start = c(0,1), objective = nll.vonMises, x = D$wd30, lower = c(-1000, 0))
 #centrerer fordelingen omkring 3/2pi
 #D$wd30.centered <- D$wd30 - pi/2; D$wd30.centered[D$wd30.centered < 0] = D$wd30.centered[D$wd30.centered < 0] + 2*pi
@@ -172,7 +173,7 @@ ggplot(D)+
                      , labels =c("0", "pi/2", "pi", "3/2pi", "2pi"))+
   #stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = par.wd30$par[1], sd = par.wd30$par[2]))+
   stat_function(fun = dwrappednormal, n = dim(D)[1], args = list(mu = wrapped.par$par[1], sd = wrapped.par$par[2]), aes(colour = "Wrapped Normal"))+
-  stat_function(fun = dwrappedcauchy, n = dim(D)[1], args = list(mu = wrapped.cauc.par$par), aes(colour = "Wrapped Cauchy"))+
+  stat_function(fun = dwrappedcauchy, n = dim(D)[1], args = list(mu = wrapped.cauc.par$par[1], rho = 0.36), aes(colour = "Wrapped Cauchy"))+
   stat_function(fun = dvonmises, n = dim(D)[1], args = list(mu = wrapped.vonMises$par[1], kappa = wrapped.vonMises$par[2]), aes(colour = "Von Mises"))+
   labs(x = "Wind Direction", colour = "")+
   scale_colour_manual(values = c("yellow", "red", "black"))
@@ -188,33 +189,53 @@ par(mfrow=c(1,1))
 alpha <- 0.05
 c <- exp(-0.5 * qchisq(1-alpha, df = 1))
 #likelihood-based
-mle.pow.exp <- par.exp$par
+mle.pow <- par.beta$par
 
-pow.fun <- function(lambda, data){
-  return(prod(dexp(x = data, rate = lambda, log = F)))
+pow.fun <- function(shape1, shape2, data){
+  return( prod( dbeta(x = data, shape1 = shape1, shape2 = shape2, log = F) ) )
 }
 
-l.pow.fun <- function(lambda, data){
-  return(sum(dexp(x = data, rate = lambda, log = T)))
+l.pow.fun <- function(shape1, shape2, data){
+  return( sum( dbeta(x = data, shape1 = shape1, shape2 = shape2, log = T) ) )
 }
 
-CIfun.pow <- function(y){
-  return(sum(dexp(x = D$pow.obs.norm, rate = mle.pow.exp, log = T)) -
-    sum(dexp(x = D$pow.obs.norm, rate = y, log = T)) -
-    0.5 * qchisq(1-alpha, df = 1))
+CIfun.pow <- function(y, first = T){##### T for shape, F for scale
+  if(first){
+    return( sum( dbeta(x = D$pow.obs.norm, shape1 = mle.pow[1], shape = mle.pow[2], log = T) ) -
+      sum( dbeta(x = D$pow.obs.norm, shape1 = y, shape2 = mle.pow[2], log = T) ) - 
+      0.5 * qchisq(1-alpha, df = 1) )
+  } else {
+    return( sum( dbeta(x = D$pow.obs.norm, shape1 = mle.pow[1], shape = mle.pow[2], log = T) ) -
+      sum( dbeta(x = D$pow.obs.norm, shape1 = mle.pow[1], shape2 = y, log = T) ) - 
+      0.5 * qchisq(1-alpha, df = 1) ) 
+  }
 }
-lambdas <- seq(0.2,7, by = 0.1)
-pow <- sapply(X = lambdas, FUN = pow.fun, data = D$pow.obs.norm)
-plot(lambdas, pow/max(pow), col = 1, type = "l", xlab = expression(paste(lambda)),
-     main = "Parameter values for exponential model of power production")
-CI.pow <- c(uniroot(f = CIfun.pow, interval = c(0.2, mle.pow.exp))$root,
-            uniroot(f = CIfun.pow, interval = c(mle.pow.exp, 7))$root)
-lines(range(lambdas), c*c(1,1), col = 2)
+
+par(mfrow=c(1,2))
+shape1s <- seq(0, 1, by = 0.01)
+pow1 <- sapply(X = shape1s, FUN = pow.fun, data = D$pow.obs.norm, shape2 = mle.pow[2])
+plot(shape1s, pow1/max(pow1), col = 1, type = "l", xlab = expression(paste(alpha)),
+     main = "Parameter value shape1 for beta model of power production")
+CI.pow1 <- c(uniroot(f = CIfun.pow, interval = c(0, mle.pow[1]), first = T)$root,
+            uniroot(f = CIfun.pow, interval = c(mle.pow[1], 1), first = T)$root)
+lines(range(shape1s), c*c(1,1), col = 2)
+
+shape2s <- seq(1, 2, by = 0.01)
+pow2 <- sapply(X = shape2s, FUN = pow.fun, data = D$pow.obs.norm, shape1 = mle.pow[1])
+plot(shape2s, pow2/max(pow2), col = 1, type = "l", xlab = expression(paste(beta)),
+     main = "Parameter value shape2 for beta model of power production")
+CI.pow2 <- c(uniroot(f = CIfun.pow, interval = c(1, mle.pow[2]), first = F)$root,
+             uniroot(f = CIfun.pow, interval = c(mle.pow[2], 2), first = F)$root)
+lines(range(shape2s), c*c(1,1), col = 2)
 
 #wald
-H.pow <- hessian(l.pow.fun, mle.pow.exp, data = D$pow.obs.norm)
-V.pow <- as.numeric(-1/H.pow)
-wald.pow <- mle.pow.exp + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.pow)
+n <- dim(D)[1]
+H.pow.shape1 <- hessian(l.pow.fun, mle.pow[1], shape2 = mle.pow[2], data = D$pow.obs.norm)
+V.pow.shape1 <- as.numeric(-1/H.pow.shape1)
+H.pow.shape2 <- hessian(l.pow.fun, mle.pow[2], shape1 = mle.pow[1], data = D$pow.obs.norm)
+V.pow.shape2 <- as.numeric(-1/H.pow.shape2)
+wald.pow.shape1 <- mle.pow[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.pow.shape1)
+wald.pow.shape2 <- mle.pow[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.pow.shape2)
 
 ## CI ## WIND SPEED
 par(mfrow=c(1,2))
@@ -269,60 +290,57 @@ wald.ws30.scale <- mle.ws30.weib[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30.s
 ## CI ## WIND DIRECTION
 par(mfrow=c(1,2))
 #likelihood-based
-mle.wd30.norm <- par.wd30$par
+mle.wd30 <- wrapped.cauc.par$par
 
-wd30.fun <- function(mu, sigma, data){#####
-  prod(dnorm(x = data, mean = mu, sd = sigma, log = F))
+wd30.fun <- function(mu, rho, data){#####
+  prod(dwrappedcauchy(x = data, mu = mu, rho = rho))
 }
 
-l.wd30.fun <- function(mu, sigma, data){#####
-  sum(dnorm(x = data, mean = mu, sd = sigma, log = T))
+l.wd30.fun <- function(mu, rho, data){#####
+  sum( log( dwrappedcauchy(x = data, mu = mu, rho = rho) ) )
 }
 
 CIfun.wd30 <- function(y, mu = T){##### T from mean, F for sigma
   if(mu){
-    sum(dnorm(x = D$wd30.centered, mean = mle.wd30.norm[1], sd = mle.wd30.norm[2], log = T)) -
-      sum(dnorm(x = D$wd30.centered, mean = y, sd = mle.wd30.norm[2], log = T)) - 
-      0.5 * qchisq(1-alpha, df = 1)
+    return( sum( log( dwrappedcauchy(x = D$wd30, mu = mle.wd30[1], rho = mle.wd30[2]) ) ) -
+      sum( log( dwrappedcauchy(x = D$wd30, mu = y, rho = mle.wd30[2]) ) ) -
+      0.5 * qchisq(1-alpha, df = 1) )
   } else {
-    sum(dnorm(x = D$wd30.centered, mean = mle.wd30.norm[1], sd = mle.wd30.norm[2], log = T)) -
-      sum(dnorm(x = D$wd30.centered, mean = mle.wd30.norm[1], sd = y, log = T)) - 
-      0.5 * qchisq(1-alpha, df = 1) 
+    return( sum( log( dwrappedcauchy(x = D$wd30, mu = mle.wd30[1], rho = mle.wd30[2]) ) ) - 
+      sum( log( dwrappedcauchy(x = D$wd30, mu = mle.wd30[1], rho = y) ) ) -
+      0.5 * qchisq(1-alpha, df = 1) )
   }
 }
-mus <- seq(0, 6, by = 0.1)
-wd30.mu <- sapply(X = mus, FUN = wd30.fun, sigma = mle.wd30.norm[2], data = D$wd30.centered)
-plot(mus, wd30.mu/max(wd30.mu), col = 1, type = "l", xlab = expression(paste(mu)),
-     main = "Parameter value for mean for normal model of wind direction")
-CI.wd30.mu <- c(uniroot(f = CIfun.wd30, interval = c(0, mle.wd30.norm[1]), mu = T)$root,
-                uniroot(f = CIfun.wd30, interval = c(mle.wd30.norm[1], 6), mu = T)$root)
+
+mus <- seq(-2.5, -1, by = 0.01)
+wd30.mu <- sapply(X = mus, FUN = wd30.fun, rho = mle.wd30[2], data = D$wd30)
+plot(mus, wd30.mu/max(wd30.mu), col = 1, type = "l", xlab = expression(paste("peak, ", mu)),
+     main = "Parameter value for peak for wrapped cauchy model of wind direction")
+CI.wd30.mu <- c(uniroot(f = CIfun.wd30, interval = c(-2.5, mle.wd30[1]), mu = T)$root,
+                uniroot(f = CIfun.wd30, interval = c(mle.wd30[1], -1), mu = T)$root)
 lines(range(mus), c*c(1,1), col = 2)
 
-sigmas <- seq(0, 2.5, by = 0.1)
-wd30.sigma <- sapply(X = sigmas, FUN = wd30.fun, mu = mle.wd30.norm[1], data = D$wd30.centered)
-plot(sigmas^2, wd30.sigma/max(wd30.sigma), col = 1, type = "l", xlab = expression(paste(sigma^2)),
-     main = "Parameter value for var for normal model of wind direction")
-CI.wd30.sigma <- c(uniroot(f = CIfun.wd30, interval = c(0, mle.wd30.norm[2]), mu = F)$root,
-                   uniroot(f = CIfun.wd30, interval = c(mle.wd30.norm[2], 2.5), mu = F)$root)
-CI.wd30.sigmasq <- CI.wd30.sigma^2
-lines(range(sigmas^2), c*c(1,1), col = 2)
+rhos <- seq(0, 0.5, by = 0.005)
+wd30.rho <- sapply(X = rhos, FUN = wd30.fun, mu = mle.wd30[1], data = D$wd30)
+plot(rhos, wd30.rho/max(wd30.rho), col = 1, type = "l", xlab = expression(paste("scale, ", gamma)),
+     main = "Parameter value for scale factor for wrapped cauchy model of wind direction")
+CI.wd30.rho <- c(uniroot(f = CIfun.wd30, interval = c(0, mle.wd30[2]), mu = F)$root,
+                   uniroot(f = CIfun.wd30, interval = c(mle.wd30[2], 0.5), mu = F)$root)
+lines(range(rhos), c*c(1,1), col = 2)
 
 #wald
 n <- dim(D)[1]
-H.wd30.mu <- hessian(l.wd30.fun, mle.wd30.norm[1], sigma = mle.wd30.norm[2], data = D$wd30.centered)
+H.wd30.mu <- hessian(l.wd30.fun, mle.wd30[1], rho = mle.wd30[2], data = D$wd30)
 V.wd30.mu <- as.numeric(-1/H.wd30.mu)
-H.wd30.sigma <- hessian(l.wd30.fun, mle.wd30.norm[2], mu = mle.wd30.norm[1], data = D$wd30.centered)
-V.wd30.sigma <- as.numeric(-1/H.wd30.sigma)
-I11 <- n/mle.wd30.norm[2]^2;1/I11;V.wd30.mu# P. 59
-I22 <- n/( 2 * mle.wd30.norm[2]^4 );1/I22;V.wd30.sigma#Det driller med denne :(
-wald.wd30.mu <- mle.wd30.norm[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(1/I11)
-wald.wd30.sigmasq <- mle.wd30.norm[2]^2 + c(-1,1) * qnorm(1-alpha/2) * sqrt(1/I22)
+H.wd30.rho <- hessian(l.wd30.fun, mle.wd30[2], mu = mle.wd30[1], data = D$wd30)
+V.wd30.rho <- as.numeric(-1/H.wd30.rho)
+wald.wd30.mu <- mle.wd30[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.wd30.mu)
+wald.wd30.rho <- mle.wd30[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.wd30.rho)
 
 #All CIs of parameters
-mle.wd30.norm.sq <- c(mle.wd30.norm[1], mle.wd30.norm[2]^2)
-round(rbind(CI.pow, wald.pow, mle.pow.exp, CI.ws30.shape, wald.ws30.shape,
-            CI.ws30.scale, wald.ws30.scale,mle.ws30.weib, CI.wd30.mu, wald.wd30.mu,
-            CI.wd30.sigmasq, wald.wd30.sigmasq, mle.wd30.norm.sq), digits=5)
+round( rbind( CI.pow1, wald.pow.shape1, CI.pow2, wald.pow.shape2, mle.pow,
+              CI.ws30.shape, wald.ws30.shape, CI.ws30.scale, wald.ws30.scale, mle.ws30.weib, 
+              CI.wd30.mu, wald.wd30.mu, CI.wd30.rho, wald.wd30.rho, mle.wd30 ), digits = 3 )
 
 #CI.E.pow.obs <- 1/par$par + c(-1,1) * qnorm(1-alpha/2) * sqrt(1/par$par^2) / dim(D)[1]
 CI.E.pow.obs <- mean(D$pow.obs.norm) + c(-1,1) * qnorm(1-alpha/2) * sd(D$pow.obs.norm) / dim(D)[1]
@@ -332,8 +350,8 @@ V.ws30 <- par.ws30$par[2]^2*( gamma(1+2/par.ws30$par[1]) - (gamma(1+1/par.ws30$p
 #CI.E.ws30 <- E.ws30 + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30) / dim(D)[1] #according to Central Limit Theorem
 CI.E.ws30 <- mean(D$ws30) + c(-1,1) * qnorm(1-alpha/2) * sd(D$ws30) / dim(D)[1]
 #CI.E.wd30 <- par.wd30$par[1] + c(-1,1) * qnorm(1-alpha/2) * par.wd30$par[2] / dim(D)[1] #according to Central Limit Theorem
-CI.E.wd30 <- mean(D$wd30.centered) + c(-1,1) * qnorm(1-alpha/2) * sd(D$wd30.centered) / dim(D)[1]
+CI.E.wd30 <- mle.wd30[1] + c(-1,1) * qnorm(1-alpha/2) * sd(D$wd30) / dim(D)[1] #mean(D$wd30) instead gives another result
 
-round(rbind(c(CI.E.pow.obs[1], 1/par.exp$par, CI.E.pow.obs[2]) , c(CI.E.ws30[1], E.ws30, CI.E.ws30[2]) , c(CI.E.wd30[1], mle.wd30.norm.sq[1], CI.E.wd30[2])), digits=5)
+round(rbind(c(CI.E.pow.obs[1], 1/par.exp$par, CI.E.pow.obs[2]) , c(CI.E.ws30[1], E.ws30, CI.E.ws30[2]) , c(CI.E.wd30[1], mle.wd30[1], CI.E.wd30[2])), digits=5)
 
 
