@@ -157,24 +157,19 @@ summary(fit.glm)
 # Confidence interval for the two beta parameters. 
 confint(fit.glm)
 #calculate profile likelihoods
-prof.b0 <- function(beta0, x, n){
+prof.b0 <- function(beta0, x = log.data$AIDS_yes[2], n = log.data$n[2]){
   p <- exp(beta0)/(1+exp(beta0))
-  return(-dbinom(x, size = n, prob = p, log = T))
+  return(sum(dbinom(x, size = n, prob = p, log = T)))
 }
 
-prof.b1 <- function(beta1, beta0, x, n){
+prof.b1 <- function(beta1, beta0, x = log.data$AIDS_yes[1], n = log.data$n[1]){
   p <- exp(beta0+beta1)/(1+exp(beta0+beta1))
-  return(-dbinom(x, size = n, prob = p, log = T))
+  return(sum(dbinom(x, size = n, prob = p, log = T)))
 }
 beta.zero.sims <- seq(-1.5,-0.6,0.01)
 beta.one.sims <- seq(-1.3,-0.2,0.01)
-pL.b0 <- prof.b0(beta.zero.sims
-                 , x = log.data$AIDS_yes[2]
-                 , n = log.data$n[2])
-pL.b1 <- prof.b1(beta.one.sims
-                 , x = log.data$AIDS_yes[1]
-                 , n = log.data$n[1]
-                 , beta0 = beta_0)
+pL.b0 <- exp(sapply(beta.zero.sims, FUN = prof.b0))
+pL.b1 <- exp(sapply(beta.one.sims, FUN = prof.b1, beta0 = beta_0))
 par(mfrow=c(1,2))
 plot(beta.zero.sims
      , -(pL.b0+max(-pL.b0))
@@ -187,6 +182,13 @@ plot(beta.one.sims
      ,main = "Profile likelihood for Beta_1")
 abline(h = -qchisq(0.95, df = 1)/2, lty = "dashed")
 
+library(sen)
+plot(confint(fit.glm, Log = T, fig = T))
+pr <- profile(fit.glm)
+plot(pr$AZT$par.vals[,2], pr$AZT$z)
+abline(h = 0.5*qchisq(0.95, df = 1))
+abline(h = -0.5*qchisq(0.95, df = 1))
+abline(v = c(CI.1),lty = "dashed", col = 2)
 #From these figures it can be concluded that the quadratic approximation
 #of the CI through use of fischers information matrix, is a 
 #good approksimation.
@@ -316,6 +318,12 @@ chi_squared <- - 2 * ((t1$objective + t0$objective) - both$objective)
 (p_value <- 1 - pchisq(chi_squared, df = 1))
 #no difference as p_value ≈ 0.46 > 0.05.
 
+theoretical <- quantile(x = actg_event$time, probs = pexp(q = actg_event$time, rate = both$par))
+plot(theoretical, actg_event$time, main = "QQplot", xlab = "Theoretical Quantiles"
+     ,ylab = "Sample Quantiles")
+grid()
+abline(lm(actg_event$time ~ theoretical))
+
 #Overvej også at lave et residual plot for at vise at det også er et elendigt fit.
 #Overvej at beregne time ratio og hazard ratio
 
@@ -323,11 +331,18 @@ chi_squared <- - 2 * ((t1$objective + t0$objective) - both$objective)
 #### bullet point 5: Model with a parameter indicating the treatment effect. ####
 #library(survival)
 #library(survminer)
-kaplan.meier <- survfit(Surv(time) ~ tx, data = actg)
-ggsurvplot_add_all(kaplan.meier, data = actg, conf.int = T
-                   ,risk.table = T, pval = T)
+kaplan.meier <- survfit(Surv(time, event) ~ tx, data = actg)
+ggsurvplot_add_all(kaplan.meier
+                   , data = actg
+                   , conf.int = T
+                   , risk.table = "abs_pct"
+                   , ylim = c(0.8,1)
+                   , pval = T
+                   , ncensor.plot = T
+                   ,ggtheme = theme_bw()
+                   ,legend.labs = c("All", "No Treatment", "Treatment"))
 
-fit <- survreg(Surv(time, event = event) ~ tx, data = actg,
+fit <- survreg(Surv(time, event) ~ tx, data = actg,
                dist = "exponential")
 summary(fit)
 confint(fit)
@@ -459,6 +474,7 @@ text(x = CI.1[1]+0.09, y = -1.7, "CI", col = 2)
 abline(v = c(CI.1),lty = "dashed", col = 2)
 
 #Consider residual plot
+
 
 #### Try Bullet Point 4-6 again but with a weibull distribution ####
 
