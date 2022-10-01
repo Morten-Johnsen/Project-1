@@ -76,7 +76,7 @@ grid.arrange(grobs = BoxCoxPlot)
 
 
 #Compare distributions
-for (i in 1:10){
+for (i in 1:1){
   D$simdata <- rbeta(length(D$pow.obs.norm), shape1 = par.beta$par[1]
         ,shape2 = par.beta$par[2])
   b <- ggplot(D)+
@@ -158,11 +158,11 @@ wrapped.par <- nlminb(start = c(2,1), objective = nll.wrappedNormal, x = D$wd30)
 wrapped.cauc.par <- nlminb(start = 1, objective = nll.wrappedCauchy, x = D$wd30)
 wrapped.vonMises <- nlminb(start = c(0,1), objective = nll.vonMises, x = D$wd30, lower = c(-1000, 0))
 #centrerer fordelingen omkring 3/2pi
-D$wd30.centered <- D$wd30 - pi/2; D$wd30.centered[D$wd30.centered < 0] = D$wd30.centered[D$wd30.centered < 0] + 2*pi
-par.wd30 <- nlminb(start = c(4,4),
-                   objective = testDistribution,
-                   x = D$wd30.centered,
-                   distribution = "normal")
+#D$wd30.centered <- D$wd30 - pi/2; D$wd30.centered[D$wd30.centered < 0] = D$wd30.centered[D$wd30.centered < 0] + 2*pi
+#par.wd30 <- nlminb(start = c(4,4),
+#                   objective = testDistribution,
+#                   x = D$wd30.centered,
+#                   distribution = "normal")
 
 ggplot(D)+
   theme_bw()+
@@ -182,7 +182,6 @@ print(paste0("AIC wrapped normal: ", round(-2*log(wrapped.par$objective)+2*2,4),
             ,"AIC wrapped cauchy: ", round(-2*log(wrapped.cauc.par$objective)+2,4), "|"
             ,"AIC von Mises: "     , round(-2*log(wrapped.vonMises$objective)+2*2,4)))
 
-#Von mises er marginalt bedre end wrapped normal.
 
 ## CI ## WIND POWER
 par(mfrow=c(1,1))
@@ -192,17 +191,17 @@ c <- exp(-0.5 * qchisq(1-alpha, df = 1))
 mle.pow.exp <- par.exp$par
 
 pow.fun <- function(lambda, data){
-  prod(dexp(x = data, rate = lambda, log = F))
+  return(prod(dexp(x = data, rate = lambda, log = F)))
 }
 
 l.pow.fun <- function(lambda, data){
-  sum(dexp(x = data, rate = lambda, log = T))
+  return(sum(dexp(x = data, rate = lambda, log = T)))
 }
 
 CIfun.pow <- function(y){
-  sum(dexp(x = D$pow.obs.norm, rate = mle.pow.exp, log = T)) -
+  return(sum(dexp(x = D$pow.obs.norm, rate = mle.pow.exp, log = T)) -
     sum(dexp(x = D$pow.obs.norm, rate = y, log = T)) -
-    0.5 * qchisq(1-alpha, df = 1)
+    0.5 * qchisq(1-alpha, df = 1))
 }
 lambdas <- seq(0.2,7, by = 0.1)
 pow <- sapply(X = lambdas, FUN = pow.fun, data = D$pow.obs.norm)

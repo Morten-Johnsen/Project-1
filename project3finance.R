@@ -31,50 +31,13 @@ D$year <- year(D$date)
 #ggplot(D, aes(x = date, y = SLV, colour = factor(year))) + geom_point()
 ggplot(D, aes(x = date, y = SLV)) + geom_point()
 #plot(D$SLV)
-ggplot(D, aes(x = SLV)) + geom_histogram(color = 'black') #fill
+ggplot(D, aes(x = SLV)) +
+  geom_histogram(aes(y = ..density..), color = 'black')
+
 
 #########################################################################################################
 #########################################################################################################
-testDistribution <- function(p, x, distribution = "Normal", giveDistributions = F){
-  if (giveDistributions == T){
-    NLL <- c("normal", "gamma", "beta", "negative binomial")
-    distribution = "none"
-  }
-  if (str_to_lower(distribution) == "normal"){
-    mu <- p[1]
-    sigma <- p[2]
-    NLL <- -sum(dnorm(x, mean = mu, sd = sigma, log = T))
-  }
-  if (str_to_lower(distribution) == "gamma"){
-    shape <- p[1]
-    rate <- p[2]
-    NLL <- -sum(dgamma(x, shape = shape, rate = rate, log = T))
-  }
-  if (str_to_lower(distribution) == "beta"){
-    #The beta distribution only ranges from [0;1] and thus it is
-    #exclusively relevant to the normalized wind power statistic
-    #and not the fitting of the other two parameters.
-    shape1 <- p[1]
-    shape2 <- p[2]
-    NLL <- -sum(dbeta(x, shape = shape1, shape2 = shape2, log = T))
-  }
-  if (str_to_lower(distribution) == "exponential"){
-    lambda = p
-    NLL <- -sum(dexp(x, rate = lambda, log = T))
-  }
-  
-  if (str_to_lower(distribution) == "weibull"){
-    shape = p[1]
-    scale = p[2]
-    NLL <- -sum(dweibull(x, shape = shape, scale = scale, log = T))
-  }
-  if (str_to_lower(distribution) == "negative binomial"){
-    alpha <- p[1] #target number of succesfull trials
-    probs <- p[2] #probability of succes in each trial
-    NLL <- -sum(dnbinom(x = alpha, size = x, prob = probs, log = T))
-  }
-  return(NLL)
-}
+source('testDistribution.R')
 #########################################################################################################
 #########################################################################################################
 par <- nlminb(start = c(1,1), objective = testDistribution,
@@ -143,8 +106,8 @@ ggplot(D)+
                                                           scale = par.cauchy$par[2]), aes(colour = "cauchy")) +
   stat_function(fun = dpn, n = dim(D)[1], args = list(alpha = par.pownorm$par), aes(colour = "powernorm")) +
   stat_function(fun = dt, n = dim(D)[1], args = list(df = par.t$par), aes(colour = "t")) +
-  #stat_function(fun = dsn, n = dim(D)[1], args = list(omega = par.sn$par[1], alpha = par.sn$par[2],
-                                                      #tau = par.sn$par[3]), aes(colour = "sn")) +
+  stat_function(fun = dsn, n = dim(D)[1], args = list(omega = par.sn$par[1], alpha = par.sn$par[2],
+                                                      tau = par.sn$par[3]), aes(colour = "sn")) +
   stat_function(fun = dgnorm, n = dim(D)[1], args = list(mu = par.gn$par[1], alpha = par.gn$par[2],
                                                          beta = par.gn$par[3]), aes(colour = "gnorm")) +
   stat_function(fun = demg, n = dim(D)[1], args = list(mu = par.emg$par[1], sigma = par.emg$par[2],
@@ -173,14 +136,14 @@ AIC.emg <- -2 * sum(demg(x=D$SLV, mu = par.emg$par[1], sigma = par.emg$par[2], l
 round(rbind(AIC.norm, AIC.cauchy, AIC.pownorm, AIC.t, AIC.sn, AIC.gn, AIC.asgn, AIC.emg), digits=5)
 
 # boxplot(D$SLV)
-# n <- 100000
-# par(mfrow=c(2,3))
-# hist(rnorm(n, mean = par$par[1], sd = par$par[2]))
-# hist(D$SLV)
-# hist(rsn(n, omega = par.sn$par[1], alpha = par.sn$par[2], tau = par.sn$par[3]))
-# hist(rgnorm(n, mu = par.gn$par[1], alpha = par.gn$par[2], beta = par.gn$par[3]))
-# hist(rcauchy(n, location = par.cauchy$par[1], scale = par.cauchy$par[2]))
-# hist(remg(n, mu = par.emg$par[1], sigma = par.emg$par[2], lambda = par.emg$par[3]))
+n <- 100000
+par(mfrow=c(2,3))
+hist(rnorm(n, mean = par$par[1], sd = par$par[2]))
+hist(D$SLV)
+hist(rsn(n, omega = par.sn$par[1], alpha = par.sn$par[2], tau = par.sn$par[3]))
+hist(rgnorm(n, mu = par.gn$par[1], alpha = par.gn$par[2], beta = par.gn$par[3]))
+hist(rcauchy(n, location = par.cauchy$par[1], scale = par.cauchy$par[2]))
+hist(remg(n, mu = par.emg$par[1], sigma = par.emg$par[2], lambda = par.emg$par[3]))
 
 # ggplot(D)+
 #   #geom_histogram(aes(x = rgnorm(dim(D)[1], mu = par.gn$par[1], alpha = par.gn$par[2], beta = par.gn$par[3]), y=..density..), color='black') +

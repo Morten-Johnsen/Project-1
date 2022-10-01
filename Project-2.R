@@ -155,7 +155,6 @@ summary(fit.glm)
 #results show: -0.72 logits(?) for developing AIDS when using the treatment
 
 # Confidence interval for the two beta parameters. 
-# Bør det her være for beta eller p????
 confint(fit.glm)
 #calculate profile likelihoods
 prof.b0 <- function(beta0, x, n){
@@ -506,8 +505,8 @@ chi_squared <- - 2 * (theta_hat$objective - theta_no_treatment_effect$objective)
 
 beta.zero.sims <- seq(7.8,8.7,0.01)
 beta.one.sims <- seq(0.2,1.6,0.01)
-pL.beta0 <- apply(X = data.frame(theta_hat$par[1], beta.zero.sims,theta_hat$par[3]), MARGIN = 1 , FUN = nll.wei, time = actg$time, event = actg$event, treatment = actg$tx)
-pL.beta1 <- apply(X = data.frame(theta_hat$par[1], theta_hat$par[2],beta.one.sims), MARGIN = 1 , FUN = nll.wei, time = actg$time, event = actg$event, treatment = actg$tx)
+pL.beta0 <- apply(X = data.frame(theta_hat$par[1], beta.zero.sims, theta_hat$par[3]), MARGIN = 1 , FUN = nll.wei)
+pL.beta1 <- apply(X = data.frame(theta_hat$par[1], theta_hat$par[2], beta.one.sims), MARGIN = 1 , FUN = nll.wei)
 
 par(mfrow=c(1,2))
 plot(beta.zero.sims
@@ -564,6 +563,9 @@ abline(v = Wald.CI[3,], col = 6)
 text(x = Wald.CI[3,1]+0.25, y = -1.6, "Wald CI", col = 6)
 text(x = CI.1[1]+0.09, y = -1.7, "CI", col = 2)
 abline(v = c(CI.1),lty = "dashed", col = 2)
+
+
+
 
 #### Er rimelig sikker på at alt herunder ikke nødvendigvis er korrekt, og at man i stedet bør anvende noget ####
 #kaplan-meier.
