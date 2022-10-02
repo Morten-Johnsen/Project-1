@@ -324,13 +324,13 @@ V.gn <- mle.gn[2]^2 * gamma(3/mle.gn[3]) / gamma(1/mle.gn[3])
 CI.E.gn <- E.gn + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.gn / n)
 rbind(E.gn);rbind(CI.E.gn)
 
-textbox <- expression(paste(mu, ": 0.0021  ", alpha, ": 0.0520  ", beta, ": 1.391")) #mu = mle.gn[1], alpha =  mle.gn[2], beta = mle.gn[3]
+temp1 <- paste("mu == ", mle.gn[1])
+temp2 <- paste("alpha == ", mle.gn[2])
+temp3 <- paste("beta == ", mle.gn[3])
 
 ggplot(D)+
   geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
   stat_function(fun = dgnorm, n = dim(D)[1], args = list(mu = par.gn$par[1], alpha = par.gn$par[2],
                                                          beta = par.gn$par[3]), color = 'red') +
-  annotate( "label", x = 2.7/5*max(D$SLV), y = 10.5, label = textbox  ) +
+  annotate( "text", x = 2.7/5*max(D$SLV), y = c(10.5, 10.0, 9.4), label = c(temp1,temp2,temp3), parse = T  ) +
   ggtitle("Generalized normal distribution and distribution of the weekly returns")
-
-
