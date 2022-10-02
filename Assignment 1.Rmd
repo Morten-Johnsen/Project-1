@@ -3,12 +3,13 @@ title: "Assignment 1"
 author: "Johnsen"
 date: "2022-10-01"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
 ---
 
 ```{r, include = F}
-knitr::opts_chunk$set(warning = F)
+knitr::opts_chunk$set(warning = F, fig.height = 4, message = F, dpi = 500)
 rm(list = ls())
 library(lubridate)
 library(tidyverse)
@@ -26,6 +27,7 @@ library(emg)
 library(survival)
 library(survminer)
 library(circular)
+library(latex2exp)
 
 if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
   setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
@@ -75,7 +77,9 @@ meltD <- D %>%
 
 ggplot(meltD)+
   geom_histogram(aes(x = value, fill = variable), colour = "white")+
-  facet_wrap(~ variable, scales = "free")
+  facet_wrap(~ variable, scales = "free")+
+  theme_bw()+
+  labs(fill = "")
 ```
 
 Correlation analysis
@@ -180,33 +184,33 @@ par.gamma$objective
 #Sampling from the found beta distribution
 D$simdata <- rbeta(length(D$pow.obs.norm), shape1 = par.beta$par[1]
                    ,shape2 = par.beta$par[2])
-b <- ggplot(D)+
+sam.plot.pow.beta <- ggplot(D)+
   geom_histogram(aes(x = pow.obs.norm, y =..density..), colour = "white", alpha = 0.6)+
   geom_histogram(aes(x = simdata, y =..density..), alpha = 0.2, fill = "blue")+
   theme_bw()+
   ylim(c(0,10))+
   stat_function(fun = dbeta, n = length(D$pow.obs.norm), args = list(shape1 = par.beta$par[1],shape2 = par.beta$par[2]))
-show(b)
+
 #Sampling from the found exp distribution
 D$simdata <- rexp(length(D$pow.obs.norm), rate = par.exp$par)
-g <- ggplot(D)+
+sam.plot.pow.exp <- ggplot(D)+
   geom_histogram(aes(x = pow.obs.norm, y = ..density..))+
   geom_histogram(aes(x = simdata, y = ..density..)
                  , alpha = 0.2, fill = "blue")+
   theme_bw()+
   stat_function(fun = dexp, n = length(D$pow.obs.norm), args = list(rate = par.exp$par))
-show(g)
 
 #Sampling from the found gamma distribution
 D$simdata <- rgamma(length(D$pow.obs.norm), shape = par.gamma$par[1], rate = par.gamma$par[2])
-g <- ggplot(D)+
+sam.plot.pow.gamma <- ggplot(D)+
   geom_histogram(aes(x = pow.obs.norm, y = ..density..))+
   geom_histogram(aes(x = simdata, y = ..density..)
                  , alpha = 0.2, fill = "blue")+
   theme_bw()+
   ylim(c(0,10))+
   stat_function(fun = dgamma, n = length(D$pow.obs.norm), args = list(shape = par.gamma$par[1], rate = par.gamma$par[2]))
-show(g)
+
+grid.arrange(sam.plot.pow.beta, sam.plot.pow.exp, sam.plot.pow.gamma, ncol = 3)
 
 #Remove simulated data from the data frame
 D <- D %>%
@@ -586,7 +590,12 @@ print(paste0("Mean p for group with AZT treatment: ", round(AZT.par$par,3)))
 print(paste0("Mean p for group with no AZT treatment: ", round(no.AZT.par$par,3)))
 ```
 
+Result: There is a statistically significant effect of the treatment.
+
 #### Estimate parameters in the model (p0 probability of AIDS in control group, p1 probability of AIDS in treatment group) and report a confidence interval for the parameter describing the difference, compare with the result above.
+
+
+Here $p_0$ indicate the risk of developing AIDS in the control group and $p_1$ indicate the risk of developing AIDS in the AZT treatment group.
 
 ```{r}
 #Estimate parameters in the model and report a confidence interval for the parameter 
@@ -630,55 +639,73 @@ summary(fit.glm)
 #results show: -0.72 logits(?) for developing AIDS when using the treatment
 
 # Confidence interval for the two beta parameters. 
-confint(fit.glm)
 #calculate profile likelihoods
 prof.b0 <- function(beta0, x = log.data$AIDS_yes[2], n = log.data$n[2]){
   p <- exp(beta0)/(1+exp(beta0))
-  return(sum(dbinom(x, size = n, prob = p, log = T)))
+  return(-sum(dbinom(x, size = n, prob = p, log = T)))
 }
 
 prof.b1 <- function(beta1, beta0, x = log.data$AIDS_yes[1], n = log.data$n[1]){
   p <- exp(beta0+beta1)/(1+exp(beta0+beta1))
-  return(sum(dbinom(x, size = n, prob = p, log = T)))
+  return(-sum(dbinom(x, size = n, prob = p, log = T)))
 }
 beta.zero.sims <- seq(-1.5,-0.6,0.01)
 beta.one.sims <- seq(-1.3,-0.2,0.01)
-pL.b0 <- exp(sapply(beta.zero.sims, FUN = prof.b0))
-pL.b1 <- exp(sapply(beta.one.sims, FUN = prof.b1, beta0 = beta_0))
+pL.b0 <- sapply(beta.zero.sims, FUN = prof.b0)
+pL.b1 <- sapply(beta.one.sims, FUN = prof.b1, beta0 = beta_0)
 par(mfrow=c(1,2))
 plot(beta.zero.sims
      , -(pL.b0+max(-pL.b0))
      , "l"
-     ,main = "Profile likelihood for Beta_0")
+     , main = TeX("Profile log-likelihood: $\\beta_0$"))
 abline(h = -qchisq(0.95, df = 1)/2, lty = "dashed")
 plot(beta.one.sims
      , -(pL.b1+max(-pL.b1))
      , "l"
-     ,main = "Profile likelihood for Beta_1")
+     , main = TeX("Profile log-likelihood: $\\beta_1$"))
 abline(h = -qchisq(0.95, df = 1)/2, lty = "dashed")
+```
 
-#From these figures it can be concluded that the quadratic approximation
-#of the CI through use of fischers information matrix, is a 
-#good approksimation.
-#redefine because x is used
+From these figures it can be concluded that the quadratic approximation of the CI through use of Fischers information matrix, is a sufficiently good approximation.
 
+The Wald and likelihood-based confidence intervals for the two $\beta_i, i\in (0,1)$ parameters can be seen printed below.
+```{r}
 sd_0 <- as.numeric(sqrt(solve(hessian(beta_0, func = nll.p_0))))
 sd_1 <- as.numeric(sqrt(solve(hessian(beta_1, func = nll.p_1, beta_0 = beta_0))))
 
 #Wald 95% CIs and profile-likelihoods with approx 95% CI
-(W.CI.0 <- beta_0 + c(-1,1)*qnorm(0.975)*sd_0)
-(W.CI.1 <- beta_1 + c(-1,1)*qnorm(0.975)*sd_1)
+W.CI.0 <- round(beta_0 + c(-1,1)*qnorm(0.975)*sd_0,4)
+W.CI.1 <- round(beta_1 + c(-1,1)*qnorm(0.975)*sd_1,4)
 
 #Direkte numerisk approksimation:
-(CI.0 <- c(min(beta.zero.sims[-(pL.b0+max(-pL.b0)) > -qchisq(0.95, df = 1)/2])
-           ,max(beta.zero.sims[-(pL.b0+max(-pL.b0)) > -qchisq(0.95, df = 1)/2])))
-(CI.1 <- c(min(beta.one.sims[-(pL.b1+max(-pL.b1)) > -qchisq(0.95, df = 1)/2])
-           ,max(beta.one.sims[-(pL.b1+max(-pL.b1)) > -qchisq(0.95, df = 1)/2])))
+CI.0 <- round(c(min(beta.zero.sims[-(pL.b0+max(-pL.b0)) > -qchisq(0.95, df = 1)/2])
+           ,max(beta.zero.sims[-(pL.b0+max(-pL.b0)) > -qchisq(0.95, df = 1)/2])), 4)
+CI.1 <- round(c(min(beta.one.sims[-(pL.b1+max(-pL.b1)) > -qchisq(0.95, df = 1)/2])
+           ,max(beta.one.sims[-(pL.b1+max(-pL.b1)) > -qchisq(0.95, df = 1)/2])), 4)
 
+cat(paste("Wald Confidence intervals:"
+      ,paste("\nbeta_0 = ", round(beta_0, 4), " [95% CI: ", W.CI.0[1],", ", W.CI.0[2],"]")
+      ,paste("\nbeta_0 = ", round(beta_1, 4), " [95% CI: ", W.CI.1[1],", ", W.CI.1[2],"]")
+      ,"\n\nLikelihood-based Confidence intervals:"
+      ,paste0("\nbeta_0 = ", round(beta_0, 4), " [95% CI: ", CI.0[1],", ", CI.0[2],"]")
+      ,paste0("\nbeta_0 = ", round(beta_1, 4), " [95% CI: ", CI.1[1],", ", CI.1[2],"]")))
+```
+
+Comparing these to eachother, we see that the Wald CI is a very good approximation of the actual CIs. However, when comparing the estimates from our glm model we see that the $95\%$ CI for AZT is wider for the model estimate...
+
+```{r}
+confint(fit.glm)
+```
+
+
+Below can be seen the profile log-likelihoods for the two parameters, alongside their CIs.
+
+```{r}
+par(mfrow = c(1,2))
 plot(beta.zero.sims
      , -(pL.b0+max(-pL.b0))
      , "l"
-     ,main = "Profile likelihood for Beta 0"
+     ,main = TeX("Profile log-likelihood: $\\beta_0$")
      ,xlab = expression(beta[0])
      ,ylab = "lp - max(lp)")
 abline(h = -qchisq(0.95, df = 1)/2, col = 2)
@@ -689,7 +716,7 @@ abline(v = c(CI.0), lty = "dashed", col = 2)
 plot(beta.one.sims
      , -(pL.b1+max(-pL.b1))
      , "l"
-     ,main = "Profile likelihood for beta 1"
+     ,main = TeX("Profile log-likelihood: $\\beta_1$")
      ,xlab = expression(beta[1])
      ,ylab = "lp - max(lp)")
 abline(h = -qchisq(0.95, df = 1)/2, col = 2)
@@ -795,7 +822,14 @@ grid.arrange(p.both, p.t1, p.t2, nrow = 1)
 chi_squared <- - 2 * ((t1$objective + t0$objective) - both$objective)
 (p_value <- 1 - pchisq(chi_squared, df = 1))
 #no difference as p_value: 0.46 > 0.05.
+```
 
+From the above calculation of the p-value = `{r} p_value`, we see that there's - according to this model - no significant difference is achieved by using the treatment. However, this model is flawed, as it does not account for all the censored datapoints. This will be addressed in the coming analysis, where we use the kaplan meier survival analysis.
+
+
+Below can be seen a QQ-plot of the model, which also clearly shows that the model is unable to capture the underlying distribution of the data.
+
+```{r}
 theoretical <- quantile(x = actg_event$time, probs = pexp(q = actg_event$time, rate = both$par))
 plot(theoretical, actg_event$time, main = "QQplot", xlab = "Theoretical Quantiles"
      ,ylab = "Sample Quantiles")
@@ -808,7 +842,7 @@ abline(lm(actg_event$time ~ theoretical))
 
 (e.g. E[T] = $e^\beta_0$ if control group and E[T] = $e^{\beta_0 + \beta_1}$ if treatment group)
 
-```{r}
+```{r, fig.height=7}
 kaplan.meier <- survfit(Surv(time, event) ~ tx, data = actg)
 ggsurvplot_add_all(kaplan.meier
                    , data = actg
@@ -834,7 +868,19 @@ confint(fit)
 
 #ifølge ovenstående er der statistisk signifikant forskel. Herunder regnes i hånden i stedet, så
 #vi ved hvad der foregår.
+```
 
+Are the effect of the treatment statistically significant?
+```{r}
+surv_diff <- survdiff(Surv(time, event) ~ tx, data = actg)
+surv_diff
+```
+Yes it is.
+
+
+Same calculations but now performed by hand:
+
+```{r, fig.height=7}
 #I hånden (jvf. slides fra uge 7):
 #model: T = exp(B0 + B1*tx)*epsilon, epsilon ~ exp(1)
 #Der kan opstilles to forskellige modeller afhængigt af tx = 0 eller tx = 1.
@@ -889,8 +935,8 @@ chi_squared <- - 2 * (beta_hat$objective - beta_no_treatment_effect$objective)
 #Calculate profile likelihoods to ensure that the quadratic approximation by using Fischers Information matrix
 #is acceptable.
 
-beta.zero.sims <- seq(7.35,7.9,0.01)
-beta.one.sims <- seq(0.3,1.2,0.01)
+beta.zero.sims <- seq(7.3,7.9,0.01)
+beta.one.sims <- seq(0.2,1.2,0.01)
 pL.beta0 <- apply(X = data.frame(beta.zero.sims,beta_hat$par[2]), MARGIN = 1 , FUN = nll.exp, time = actg$time, event = actg$event, treatment = actg$tx)
 pL.beta1 <- apply(X = data.frame(beta_hat$par[1],beta.one.sims), MARGIN = 1 , FUN = nll.exp, time = actg$time, event = actg$event, treatment = actg$tx)
 
@@ -901,7 +947,7 @@ plot(beta.zero.sims
      ,main = "Profile likelihood for Beta 0"
      ,xlab = expression(beta[0])
      ,ylab = "lp - max(lp)"
-     ,ylim = c(-3,0))
+     ,ylim = c(-3.2,0))
 abline(h = -qchisq(0.95, df = 1)/2, col = 2)
 plot(beta.one.sims
      , -(pL.beta1+max(-pL.beta1))
@@ -909,7 +955,7 @@ plot(beta.one.sims
      ,main = "Profile likelihood for beta 1"
      ,xlab = expression(beta[1])
      ,ylab = "lp - max(lp)"
-     ,ylim = c(-3,0))
+     ,ylim = c(-3.2,0))
 abline(h = -qchisq(0.95, df = 1)/2, col = 2)
 
 ```
@@ -923,25 +969,40 @@ sd <- as.numeric(sqrt(diag(solve(hessian(beta_hat$par, func = nll.exp)))))
 
 #Wald 95 procent CIs and profile-likelihoods with approx 95 procent CI
 #Måske er der et eller andet i vejen med de her WALD CIs
-(Wald.CI <- beta_hat$par + matrix(c(-1,1), 2,2, byrow = T) * matrix(qnorm(0.975)*sd, 2,2, byrow = F))
+Wald.CI <- round(beta_hat$par + matrix(c(-1,1), 2,2, byrow = T) * matrix(qnorm(0.975)*sd, 2,2, byrow = F),4)
 
 #Direkte numerisk approksimation:
-(CI.0 <- c(min(beta.zero.sims[-(pL.beta0+max(-pL.beta0)) > -qchisq(0.95, df = 1)/2])
-           ,max(beta.zero.sims[-(pL.beta0+max(-pL.beta0)) > -qchisq(0.95, df = 1)/2])))
-(CI.1 <- c(min(beta.one.sims[-(pL.beta1+max(-pL.beta1)) > -qchisq(0.95, df = 1)/2])
-           ,max(beta.one.sims[-(pL.beta1+max(-pL.beta1)) > -qchisq(0.95, df = 1)/2])))
+CI.0 <- c(min(beta.zero.sims[-(pL.beta0+max(-pL.beta0)) > -qchisq(0.95, df = 1)/2])
+           ,max(beta.zero.sims[-(pL.beta0+max(-pL.beta0)) > -qchisq(0.95, df = 1)/2]))
+CI.1 <- c(min(beta.one.sims[-(pL.beta1+max(-pL.beta1)) > -qchisq(0.95, df = 1)/2])
+           ,max(beta.one.sims[-(pL.beta1+max(-pL.beta1)) > -qchisq(0.95, df = 1)/2]))
+
+cat(paste("Wald Confidence intervals:"
+      ,paste("\nbeta_0 = ", round(beta_hat$par[1], 4), " [95% CI: ", Wald.CI[1,1],", ", Wald.CI[1,2],"]")
+      ,paste("\nbeta_1 = ", round(beta_hat$par[2], 4), " [95% CI: ", Wald.CI[2,1],", ", Wald.CI[2,2],"]")
+      ,"\n\nLikelihood-based Confidence intervals:"
+      ,paste0("\nbeta_0 = ", round(beta_hat$par[1], 4), " [95% CI: ", CI.0[1],", ", CI.0[2],"]")
+      ,paste0("\nbeta_1 = ", round(beta_hat$par[2], 4), " [95% CI: ", CI.1[1],", ", CI.1[2],"]")))
 ```
+
+Comparing with the results from the survfit function:
+```{r}
+confint(fit)
+```
+
+Same as the wald CI. The likelihood based CI is a bit more narrow.
 
 #### Derive the theoretical results for the models above, including the standard error estimates, use this to formulate and implement the profile likelihood function for the treatment parameter
 
 ```{r}
+par(mfrow = c(1,2))
 plot(beta.zero.sims
      , -(pL.beta0+max(-pL.beta0))
      , "l"
      ,main = "Profile likelihood for Beta 0"
      ,xlab = expression(beta[0])
      ,ylab = "lp - max(lp)"
-     ,ylim = c(-3,0))
+     ,ylim = c(-3.2,0))
 abline(h = -qchisq(0.95, df = 1)/2, col = 2)
 abline(v = Wald.CI[1,], col = 6)
 text(x = Wald.CI[1,1]+.15, y = -2.4, "Wald CI", col = 6)
@@ -953,7 +1014,7 @@ plot(beta.one.sims
      ,main = "Profile likelihood for beta 1"
      ,xlab = expression(beta[1])
      ,ylab = "lp - max(lp)"
-     ,ylim = c(-3,0))
+     ,ylim = c(-3.2,0))
 abline(h = -qchisq(0.95, df = 1)/2, col = 2)
 abline(v = Wald.CI[2,], col = 6)
 text(x = Wald.CI[2,1]+0.25, y = -1.6, "Wald CI", col = 6)
