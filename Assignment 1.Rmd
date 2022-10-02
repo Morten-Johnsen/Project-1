@@ -457,6 +457,45 @@ mu <- wrapped.cauc.par$par[1]; gamma = -log(wrapped.cauc.par$par[2])
 #(CI.E.wd30 <- mle.wd30[1] + c(-1,1) * qnorm(1-alpha/2) * sd(D$wd30) / dim(D)[1]) #mean(D$wd30) instead gives another result
 
 round(rbind(c(CI.E.pow.obs[1], 1/par.exp$par, CI.E.pow.obs[2]) , c(CI.E.ws30[1], E.ws30, CI.E.ws30[2]) , c(CI.E.wd30[1], mle.wd30[1], CI.E.wd30[2])), digits=5)
+
+par(mfrow=c(1,3))
+
+temp1 <- paste("alpha == ", mle.pow[1]) #par.beta$par[1]
+temp2 <- paste("beta == ", mle.pow[2]) #par.beta$par[2]
+temp <- c(temp1, temp2)
+
+ggplot(D)+
+  geom_histogram(aes(x = pow.obs.norm, y = ..density..), colour='white', alpha=0.6, bins=30)+
+  theme_bw()+
+  stat_function(fun = dbeta, n = dim(D)[1], args = list(shape1 = mle.pow[1], shape2 = mle.pow[2]))+
+  ylim(c(0,10))+
+  annotate( "text", x = 4/5*max(D$pow.obs.norm), y = c(9.5, 9.0), label = temp, parse = T  ) +
+  ggtitle("Beta distribution and distribution of normalized power production")
+
+temp1 <- paste("k == ", mle.ws30.weib[1]) #par.ws30$par[1]
+temp2 <- paste("lambda == ", mle.ws30.weib[2]) #par.ws30$par[2]
+temp <- c(temp1, temp2)
+
+ggplot(D)+
+  geom_histogram(aes(x = ws30, y = ..count../sum(..count..)) , colour = "white", alpha=0.6, bins = 30)+
+  theme_bw()+
+  stat_function(fun = dweibull, n = dim(D)[1], args = list(shape = par.ws30$par[1], scale = par.ws30$par[2])) +
+  annotate( "text", x = 4/5*max(D$ws30), y = c(0.09,0.085), label = temp, parse = T  ) +
+  ggtitle("Weibull distribution and distribution of the wind speed")
+
+temp1 <- paste("mu ==", mle.wd30[1]) #wrapped.cauc.par$par[1]
+temp2 <- paste("rho ==", mle.wd30[2]) #wrapped.cauc.par$par[2]
+temp <- c(temp1, temp2)
+
+ggplot(D)+
+  theme_bw()+
+  geom_histogram(aes(x = wd30, y = ..density..), colour = "white", alpha = 0.6, bins = 20)+
+  scale_x_continuous(breaks = c(0,pi/2,pi,3/2*pi,2*pi)
+                     , labels =c("0", "pi/2", "pi", "3/2pi", "2pi"))+
+  stat_function(fun = dwrappedcauchy, n = dim(D)[1], args = list(mu = wrapped.cauc.par$par[1], rho = 0.36))+
+  annotate( "text", x = 1/5*max(D$wd30), y = c(0.35, 0.325), label = c(temp1,temp2), parse = T  ) +
+  ggtitle("Wrapped cauchy distribution and distribution of the wind direction")
+
 ```
 
 
