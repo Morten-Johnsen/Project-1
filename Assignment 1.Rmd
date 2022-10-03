@@ -3,9 +3,9 @@ title: "Assignment 1"
 author: "Johnsen"
 date: "2022-10-01"
 output:
-  pdf_document: default
   html_document:
     df_print: paged
+  pdf_document: default
 ---
 
 ```{r, include = F}
@@ -418,8 +418,8 @@ lines(range(mus), c*c(1,1), col = 2)
 
 rhos <- seq(0, 0.5, by = 0.005)
 wd30.rho <- sapply(X = rhos, FUN = wd30.fun, mu = mle.wd30[1], data = D$wd30)
-plot(rhos, wd30.rho/max(wd30.rho), col = 1, type = "l", xlab = expression(paste("scale, ", gamma)),
-     main = "Parameter value for scale factor for wrapped cauchy model of wind direction")
+plot(rhos, wd30.rho/max(wd30.rho), col = 1, type = "l", xlab = expression(paste("concentration, ", rho)),
+     main = "Parameter value for concentration factor for wrapped cauchy model of wind direction")
 CI.wd30.rho <- c(uniroot(f = CIfun.wd30, interval = c(0, mle.wd30[2]), mu = F)$root,
                    uniroot(f = CIfun.wd30, interval = c(mle.wd30[2], 0.5), mu = F)$root)
 lines(range(rhos), c*c(1,1), col = 2)
@@ -1171,7 +1171,7 @@ lines(xseq, psn(xseq, xi = par.sn$par[1], omega = par.sn$par[2], alpha = par.sn$
 
 
 #### Present the final model (i.e. relevant keynumbers for the estimates)
-First we have the profile likelihoods of the two parameters of the normal distribution optimized at the start of project 2. This is to enable comparison with the profile likelihoods of the chosen distribution which is the generalized normal distribution. Likelihood based and Wald CIs are also calculated but are not printed till later.
+First we have the profile likelihoods of the two parameters of the normal distribution optimized at the start of project 3. This is to enable comparison with the profile likelihoods of the chosen distribution which is the generalized normal distribution. Likelihood based and Wald CIs are also calculated but are not printed till later.
 
 ```{r}
 alpha <- 0.05
@@ -1298,6 +1298,9 @@ wald.mu.gn <- mle.gn[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.mu.gn)
 wald.alpha.gn <- mle.gn[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.alpha.gn)
 wald.beta.gn <- mle.gn[3] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.beta.gn)
 
+#CIs normal model
+round( rbind(CI.mu.norm, wald.mu.norm, CI.sigmasq.norm, wald.sigmasq.norm, mle.norm.sq), digits = 5)
+#CIs gnorm model
 round( rbind(CI.mu.gn, wald.mu.gn, CI.alpha.gn, wald.alpha.gn, CI.beta.gn, wald.beta.gn), digits=5);round(rbind (mle.gn), digits = 5)
 ```
 

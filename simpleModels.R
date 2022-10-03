@@ -322,7 +322,7 @@ lines(range(mus), c*c(1,1), col = 2)
 
 rhos <- seq(0, 0.5, by = 0.005)
 wd30.rho <- sapply(X = rhos, FUN = wd30.fun, mu = mle.wd30[1], data = D$wd30)
-plot(rhos, wd30.rho/max(wd30.rho), col = 1, type = "l", xlab = expression(paste("scale, ", rho)),
+plot(rhos, wd30.rho/max(wd30.rho), col = 1, type = "l", xlab = expression(paste("concentration, ", rho)),
      main = "Parameter value for concentration factor for wrapped cauchy model of wind direction")
 CI.wd30.rho <- c(uniroot(f = CIfun.wd30, interval = c(0, mle.wd30[2]), mu = F)$root,
                    uniroot(f = CIfun.wd30, interval = c(mle.wd30[2], 0.5), mu = F)$root)

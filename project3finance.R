@@ -316,6 +316,7 @@ wald.mu.gn <- mle.gn[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.mu.gn)
 wald.alpha.gn <- mle.gn[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.alpha.gn)
 wald.beta.gn <- mle.gn[3] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.beta.gn)
 
+round( rbind(CI.mu.norm, wald.mu.norm, CI.sigmasq.norm, wald.sigmasq.norm, mle.norm.sq), digits = 5)
 round( rbind(CI.mu.gn, wald.mu.gn, CI.alpha.gn, wald.alpha.gn, CI.beta.gn, wald.beta.gn), digits=5 );round(rbind (mle.gn), digits = 5)
 
 #E[x] for gnorm, x_bar +- 1.96 * sd/sqrt(n)
