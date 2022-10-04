@@ -12,6 +12,8 @@ output:
 knitr::opts_chunk$set(warning = F, fig.height = 4, message = F, dpi = 500)
 rm(list = ls())
 library(lubridate)
+library(latex2exp)
+library(circular)
 library(tidyverse)
 library(reshape)
 library(pheatmap)
@@ -26,8 +28,7 @@ library(gnorm)
 library(emg)
 library(survival)
 library(survminer)
-library(circular)
-library(latex2exp)
+
 
 if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
   setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
@@ -72,7 +73,7 @@ str(D)
 Visualization of the three relevant variables:
 ```{r}
 meltD <- D %>%
-  select(-r.day, -month, -day, -pow.obs) %>%
+  dplyr::select(-r.day, -month, -day, -pow.obs) %>%
   melt(id.vars = "date")
 
 ggplot(meltD)+
@@ -85,7 +86,7 @@ ggplot(meltD)+
 Correlation analysis
 ```{r}
 D %>%
-  select(pow.obs.norm, wd30, ws30) %>%
+  dplyr::select(pow.obs.norm, wd30, ws30) %>%
   cor() %>% 
   pheatmap()
 
@@ -160,6 +161,52 @@ source("testDistribution.R")
 
 #### Fit different probability density models to wind power, wind speed and wind direction data. You might consider different models e.g. beta, gamma, log normal, and different transformations e.g. (for wind power). It is important that you consider if the distributions/transformations are reasonable for the data that you try to model.
 
+Two approaches: 1) Box-Cox transformation 2) fit distributions directly to the standardized pow.obs.
+```{r}
+#Box-Cox transformation of pow.obs.norm
+#Examine different transformations and the achieved fit when fitting a normal
+#distribution
+
+lambda <- c(0.0, 0.05, 0.10, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4)
+pal <- palette.colors(length(lambda))
+BoxCoxPlot <- list()
+for (i in 1:length(lambda)){
+  xData <- 2*log(D$pow.obs.norm^lambda[i]/(1-D$pow.obs.norm)^(1-lambda[i]))
+  n <- nlminb(start = c(-1,1)
+              , objective = testDistribution
+              , x = xData
+              , distribution = "normal")
+  
+  #simData <- rnorm(n = length(D$pow.obs.norm), mean = n$par[1], sd = n$par[2])
+  #D$sim <- simData
+  D$BoxCox <- xData
+  
+  BoxCoxPlot[[paste0(lambda[i])]] <- ggplot(D)+
+    #geom_histogram(aes(x = sim, y = ..density..)
+    #               , colour = "white"
+    #               , alpha = 0.5
+    #               , fill = "black")+
+    geom_histogram(aes(x = BoxCox, y = ..density..)
+                   , colour = "white"
+                   , alpha = 0.6
+                   , fill = pal[[i]])+
+    labs(x = "BoxCox(pow.obs.norm)")+
+    ggtitle(paste0("BoxCox Transformation of Windpower, ", expression(lambda), " = ", lambda[i]))+
+    #geom_text(x = 2, y = 0.23, label = paste0("NLL = ", round(n$objective,2)))+
+    geom_text(x = 2, y = 0.2, label = paste0("(mean, sd) = (", round(n$par[1],2), ",", round(n$par[2],2), ")"))+
+    stat_function(fun = dnorm, n = length(D$pow.obs.norm), args = list(mean = n$par[1], sd = n$par[2]), alpha = 0.6, colour = "black")
+}
+
+grid.arrange(grobs = BoxCoxPlot)
+```
+From here it can be seen that a box-cox transformation with lambda = 0.25 might be appropriate. It is however not a good approximation as can be seen from the qqplot below.
+```{r}
+xData <- 2*log(D$pow.obs.norm^0.25/(1-D$pow.obs.norm)^(1-0.25))
+qqnorm(xData)
+qqline(xData)
+```
+
+Approach 2)
 Fit an exponential, gamma and beta distribution to the observed wind power data.
 ```{r}
 par.exp <- nlminb(start = 0.2, objective = testDistribution,
@@ -214,7 +261,7 @@ grid.arrange(sam.plot.pow.beta, sam.plot.pow.exp, sam.plot.pow.gamma, ncol = 3)
 
 #Remove simulated data from the data frame
 D <- D %>%
-  select(-simdata)
+  dplyr::select(-simdata)
 ```
 
 For wind speed distributions it is common practice to use the weibull distribution.
@@ -533,7 +580,7 @@ bin.par <- nlminb(start = 0.1, objective = testDistribution
 #separately for the groups
 x.AZT <- log.data %>%
   filter(AZT == "Yes") %>%
-  select(AIDS_yes, n) %>%
+  dplyr::select(AIDS_yes, n) %>%
   as.numeric()
 
 AZT.par <- nlminb(start = 0.1, objective = testDistribution
@@ -542,7 +589,7 @@ AZT.par <- nlminb(start = 0.1, objective = testDistribution
 
 x.no.AZT <- log.data %>%
   filter(AZT == "No") %>%
-  select(AIDS_yes, n) %>%
+  dplyr::select(AIDS_yes, n) %>%
   as.numeric()
 
 no.AZT.par <- nlminb(start = 0.1, objective = testDistribution
@@ -741,7 +788,7 @@ actg320 <- read.table("actg320.txt", header=TRUE, sep="",
 
 #select time, event and tx as they are the only relevant variables in this project
 actg <- actg320 %>%
-  select(time, event, tx)
+  dplyr::select(time, event, tx)
 ```
 
 #### How many patients got AIDS or died in the two treatment groups? What is the proportion of patients that got AIDS or died in the two group? Other relevant number that could be calculated?
@@ -756,8 +803,32 @@ actg %>%
 
 #### Fit an exponential distribution, using numerical methods, to the time of event (time) in the data set, remember to take into account that some of the data is censored (i.e. we only know that the time to the event is longer that the reported time). 1: Using all data (i.e. ignore the treatment effect) 2: Separately for the two treatments
 
+Fitting an exponential model, where we account for censoring:
 ```{r}
-#Fitting an exponential model to time for both and for each treatment
+#page 310
+theta.hat.both <- sum(actg$time)/sum(actg$event)
+```
+
+Theta for each group individually:
+```{r}
+#With treatment:
+actg_tx <- filter(actg, tx == 1)
+theta.hat.tx <- sum(actg_tx$time)/sum(actg_tx$event)
+sigma.hat.tx <- theta.hat.tx/sum(actg$event)^(1/2)
+
+#without treatment:
+actg_no_tx = filter(actg, tx == 0)
+theta.hat.no.tx <- sum(actg_no_tx$time)/sum(actg_no_tx$event)
+sigma.hat.no.tx <- theta.hat.tx/sum(actg$event)^(1/2)
+
+#Wald statistic for comparison
+(theta.hat.tx - theta.hat.no.tx)/sqrt(sigma.hat.tx^2 + sigma.hat.no.tx^2)
+#this is larger than 2 and thus statistically significant.
+```
+
+Fitting an exponential model to time for both and for each treatment where we ignore censoring
+
+```{r}
 #only use times for event = 1, to filter out all the time of event indices with are longer than the reported time
 #given the fact that the participants in the event = 0 group, has not 'experienced' the event yet.
 #Ved sgu ikke om ovenstående er en passende antagelse....
