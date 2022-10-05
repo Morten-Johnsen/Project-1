@@ -229,6 +229,7 @@ lambda_NLL <- function(lambda, x = D$pow.obs.norm){
 theta.hat <- nlminb(start = 0.2, objective = lambda_NLL)
 #round to two decimal points.
 lambda <- round(theta.hat$par, 2)
+D$transformed.pow.obs.norm <- Trans.eq1(lambda, D$pow.obs.norm)
 
 #Check qqplot:
 par(mfrow = c(1,2))
@@ -239,7 +240,64 @@ hist(y)
 ```
 **Change of variable**
 
-In order to calculate the new likelihood function for the transformed pow.obs, we use change of variable.
+In order to calculate the new likelihood function for the transformed pow.obs, we use change of variable:
+$$
+y = g(x) = \dfrac{1}{0.26} log\left(\dfrac{x^{0.26}}{1-x^{0.26}} \right)
+$$
+Now we can calculate the pdf of y as:
+$$
+f_y(y) = \dfrac{f_x(x)}{\left\vert \frac{dg}{dx} \right\vert}
+$$
+This finally yields:
+$$
+f_x(x) = f_y(y) \left\vert \dfrac{dg}{dx} \right\vert = f_y(y) \dfrac{1}{x(-1+x^\lambda)}
+$$
+Here, we can either solve our transformation expression $y=g(x)$ for $x=g^{-1}(y)$ and insert this expression, or we can simply supply the normalized pow.obs to the derivative function and our transformed data to the pdf $f_y(y)$. The likelihood of function for the distribution can now be expressed as:
+$$
+L(y) = \prod_{i=1}^n f_y(y)\dfrac{1}{g^{-1}(y)(-1+g^{-1}(y)^\lambda)}
+$$
+Calculating the negative log-likelihood we get:
+$$
+\mathcal{L}(y) = \sum_{i=1}^n log\left(f_y(y)\dfrac{1}{g^{-1}(y)(-1+g^{-1}(y)^\lambda)}\right)
+$$
+Where $f_y(y)$ is the normal distribution pdf with mean=$\mu$ and variance=$\sigma^2$). We define this log-likelihood in R and get:
+
+```{r}
+dgdx <- function(x,lambda){
+  return(-1/(x*(x^lambda - 1)))
+}
+
+#Density for y is simply the normal distribution:
+nll.y <- function(theta, x){
+  y <- Trans.eq1(lambda, x)
+  return(-sum(log(dnorm(y, mean = theta[1], sd = theta[2])*dgdx(x, lambda))))
+}
+theta.hat.y <- nlminb(start = c(0,1), objective = nll.y
+       , x = D$pow.obs.norm)
+
+#### alternative using g^-1(y) ####
+g_inverse <- function(y,lambda){
+  return((1/(exp(y*lambda)+1))^(1/lambda) * exp(y))
+}
+
+nll.y.alt <- function(theta, y){
+  return(-sum(log(dnorm(y, mean = theta[1], sd = theta[2])*dgdx(g_inverse(y,lambda), lambda))))
+}
+
+theta.hat.y.alt <- nlminb(start = c(0,1), objective = nll.y.alt
+       , y = Trans.eq1(lambda, D$pow.obs.norm))
+
+theta.hat.y$par
+theta.hat.y.alt$par
+#This yields the same estimates#
+#### Alternative end ####
+
+#plot the transformed data alongside the found distribution
+ggplot(D)+
+  geom_histogram(aes(x = transformed.pow.obs.norm, y = ..density..))+
+  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = theta.hat.y$par[1]
+                                                  , sd = theta.hat.y$par[2]))
+```
 
 
 ##### No Transformation
@@ -299,6 +357,17 @@ grid.arrange(sam.plot.pow.beta, sam.plot.pow.exp, sam.plot.pow.gamma, ncol = 3)
 D <- D %>%
   dplyr::select(-simdata)
 ```
+
+##### Comparing likelihoods
+We compare the likelihoods achieved through the different models by calculation of AIC:
+```{r}
+print(paste("AIC normal transformation: ", 2*theta.hat.y$objective+2*2))
+print(paste("AIC beta distribution: ", 2*par.beta$objective+2*2))
+print(paste("AIC exponential distribution: ", 2*par.exp$objective+2*1))
+print(paste("AIC gamma distributioun: ", 2*par.gamma$objective+2*2))
+```
+From this comparison we see that the applied transformation and subsequent fitting of a normal distribution is the most appropriate model. The normal model is `r theta.hat.y$objective/par.beta$objective` times more likely than the beta distribution (p. 30).
+
 
 For wind speed distributions it is common practice to use the weibull distribution.
 ```{r}
