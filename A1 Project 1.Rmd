@@ -1,0 +1,586 @@
+---
+title: "A1 Project 1"
+author: "Johnsen & Johnsen"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+```{r, include = F}
+knitr::opts_chunk$set(warning = F, fig.height = 4, message = F, dpi = 500)
+rm(list = ls())
+library(lubridate)
+library(latex2exp)
+library(circular)
+library(tidyverse)
+library(reshape)
+library(pheatmap)
+library(openair)
+library(stringr)
+library(numDeriv)
+library(gridExtra)
+library(openair)
+library(PowerNormal)
+library(sn)
+library(gnorm)
+library(emg)
+library(survival)
+library(survminer)
+
+
+if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
+  setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
+} else {
+  setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
+}
+source("testDistribution.R")
+```
+
+## Projekt 1: Wind Power Forecast
+
+### Descriptive Statistics
+
+#### Read the data tuno.txt into R
+
+```{r}
+D <- read.table("tuno.txt", header=TRUE, sep=" ", 
+                as.is=TRUE)
+
+D$date <- as.Date("2003-01-01")-1+D$r.day
+D$pow.obs.norm <- D$pow.obs/5000
+```
+
+
+#### Make a graphical presentation of data or parts of the data, and present some summary statistics.
+
+Summary statistics:
+```{r}
+## Dimensions of D (number of rows and columns)
+dim(D)
+```
+The dataset contains 288 observations of the 8 variables: `r names(D)`.
+
+Summary statistics of the 8 variables:
+```{r}
+## The last rows/observations
+#tail(D)
+## Selected summary statistics
+summary(D)
+## Another type of summary of the dataset
+#str(D)
+```
+As can be seen from the table above, the highest observed generated power was 4681.062, and thus our normalization based on a max of 5000 will yield an observed normalized power to be between [0;1[.
+
+Visualization of the three relevant variables:
+```{r}
+meltD <- D %>%
+  dplyr::select(-r.day, -month, -day, -pow.obs) %>%
+  melt(id.vars = "date")
+
+ggplot(meltD)+
+  geom_histogram(aes(x = value, fill = variable), colour = "white")+
+  facet_wrap(~ variable, scales = "free")+
+  theme_bw()+
+  labs(fill = "")+
+  theme(legend.position = "top")+
+  labs(y = "", x = "")+
+  ggtitle("Histograms of Windspeed, Wind Direction and Generated Power")
+```
+
+The heatmap below, shows that the observed power and the wind speed show the strongest correlation in the dataset.
+```{r}
+D %>%
+  dplyr::select(pow.obs.norm, wd30, ws30) %>%
+  cor() %>% 
+  pheatmap()
+
+#par(mfrow=c(1,2))
+#plot(D$date, D$pow.obs, type = 'l', xlab="Date", ylab="Average daily power production [kW]", 
+#     main = 'Development in average daily power production over time', cex.main = 0.8, col=1)
+#hist(D$pow.obs, xlab="Power production [kW]", main='Distribution of average daily power production', cex.main=0.8)
+```
+
+Outlier analysis:
+No outliers were found for the wind direction.
+```{r}
+outlierFUN <- function(data, quantiles){
+  v <- quantile(x = data, probs = quantiles)
+  IQR <- v[2] - v[1]
+  outliers <- ( ( data < (v[1] - 1.5 * IQR) ) | ( data > (v[2] + 1.5 * IQR) ) ) * data
+  return (outliers)
+}
+D$outlierws30 <- outlierFUN(data = D$ws30, quantiles = c(0.25,0.75))
+###              ###
+par(mfrow=c(1,2))
+plot(D$date, D$ws30, type = 'l', xlab="Date", ylab="Wind speeds [m/s]", cex.main = 0.8, col=1,
+     main='Development in wind speeds over time')
+points(x = D$date ,y = D$outlierws30, type = 'p', pch = 19, col = "red", cex = 0.25, lwd = 10)
+text(as.Date(quantile(D$r.day,probs = 0.8), origin = min(D$date)), quantile(D$ws30, probs = 1), "Outliers",  col = "red")
+hist(D$ws30, xlab="Wind speeds [m/s]", main='Distribution of wind speeds', cex.main = 0.8)
+
+# par(mfrow=c(1,2))
+# plot(D$date, D$wd30, type = 'l', xlab="Date", ylab=expression(paste("Wind direction. N = 0, E = ", pi/2)), col=1,
+#      main='Development in wind directions over time', cex.main = 0.8)
+# lines(D$date, replicate(length(D$date), 3*pi/2), type='l', col=2) #W
+# lines(D$date, replicate(length(D$date), pi), type='l', col=3) #S
+# lines(D$date, replicate(length(D$date), pi/2), type='l', col=4) #E
+# lines(D$date, replicate(length(D$date), 0), type='l', col=5) #N
+# legend('topleft', legend = c('wd30', 'W', 'S', 'E', 'N'), col = 1:5, lty = 1, cex = 0.5)
+# #
+# hist(D$wd30, xlab=expression(paste('Wind direction. N = 0, E = ', frac(pi,2))),
+#      main='Distribution of wind directions', cex.main = 0.8, freq = TRUE) #####hist to show that wind rose is fine
+# abline(v = 3*pi/2, col=2)
+# abline(v = pi, col=3)
+# abline(v = pi/2, col=4)
+# abline(v = 0, col=5)
+# legend('topleft', legend = c('wd30', 'W', 'S', 'E', 'N'), col = 1:5, lty = 1, cex = 0.5)
+
+```
+
+The distribution of the wind direction can also be examined through a wind rose visualization as to capture the fact that the wind direction have been supplied in radians, and should as such be treated as a circular distribution.
+```{r}
+D$wd30dg <- D$wd30 * 180/pi
+###wind d
+intv <- 4
+#Dwinter <- D[1:54,] #for testing the season plots above :) D$date[55] = 2003-03-01
+#Dsummer <- D[140:230,] #for testing the season plots above :) D$date[140] = 2003-06-01
+windRose(D, ws = "ws30", wd = "wd30dg", ws2 = NA, wd2 = NA,
+         ws.int = intv, angle = 30, type = "default", bias.corr = TRUE, cols
+         = "heat", grid.line = list(value=4, lty=4, col="lightgrey"), width = 1, seg = NULL, auto.text
+         = TRUE, breaks = round(max(D$ws30)/intv), offset = 10, normalise = FALSE, max.freq =
+           NULL, paddle = FALSE, key.header = "Wind speed at 30 m", key.footer = "(m/s)",
+         key.position = "bottom", key = list(height=2), dig.lab = 3, statistic =
+           "prop.count", pollutant = NULL, annotate = FALSE, angle.scale =
+           45, border = "black", main="Wind directions distribution (at 30 m)",
+         cex.main=0.75)
+```
+
+Here we see that the main wind direction is West. It is also from this direction we see the highest wind speeds.
+
+### Simple Models
+
+```{r}
+source("testDistribution.R")
+```
+
+
+#### Fit different probability density models to wind power, wind speed and wind direction data. You might consider different models e.g. beta, gamma, log normal, and different transformations e.g. (for wind power). It is important that you consider if the distributions/transformations are reasonable for the data that you try to model.
+
+We try-out three different approaches: 1) Box-Cox transformation; 2) Transformation based on Eq. 1 in the assignment description; 3) fit distributions directly to the standardized pow.obs.
+
+##### Box-Cox:
+```{r, fig.height=7}
+#Box-Cox transformation of pow.obs.norm
+#Examine different transformations and the achieved fit when fitting a normal
+#distribution
+
+lambda <- c(0.0, 0.05, 0.10, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4)
+pal <- palette.colors(length(lambda))
+BoxCoxPlot <- list()
+for (i in 1:length(lambda)){
+  xData <- 2*log(D$pow.obs.norm^lambda[i]/(1-D$pow.obs.norm)^(1-lambda[i]))
+  n <- nlminb(start = c(-1,1)
+              , objective = testDistribution
+              , x = xData
+              , distribution = "normal")
+  
+  #simData <- rnorm(n = length(D$pow.obs.norm), mean = n$par[1], sd = n$par[2])
+  #D$sim <- simData
+  D$BoxCox <- xData
+  
+  BoxCoxPlot[[paste0(lambda[i])]] <- ggplot(D)+
+    #geom_histogram(aes(x = sim, y = ..density..)
+    #               , colour = "white"
+    #               , alpha = 0.5
+    #               , fill = "black")+
+    geom_histogram(aes(x = BoxCox, y = ..density..)
+                   , colour = "white"
+                   , alpha = 0.6
+                   , fill = pal[[i]])+
+    labs(x = "BoxCox(pow.obs.norm)")+
+    ggtitle(paste0("BoxCox Transformation of Windpower, ", expression(lambda), " = ", lambda[i]))+
+    #geom_text(x = 2, y = 0.23, label = paste0("NLL = ", round(n$objective,2)))+
+    geom_text(x = 2, y = 0.2, label = paste0("(mean, sd) = (", round(n$par[1],2), ",", round(n$par[2],2), ")"))+
+    stat_function(fun = dnorm, n = length(D$pow.obs.norm), args = list(mean = n$par[1], sd = n$par[2]), alpha = 0.6, colour = "black")
+}
+
+grid.arrange(grobs = BoxCoxPlot)
+```
+From here it can be seen that a box-cox transformation with lambda = 0.25 might be appropriate. It is however not a good approximation as can be seen from the qqplot below.
+```{r}
+xData <- 2*log(D$pow.obs.norm^0.25/(1-D$pow.obs.norm)^(1-0.25))
+qqnorm(xData)
+qqline(xData)
+```
+
+##### Eq. 1 Transformation
+```{r}
+#Define transformation function
+Trans.eq1 <- function(lambda, y){
+  y_lambda <- 1/lambda * log(y^lambda/(1-y^lambda))#, lambda > 0
+  return(y_lambda)
+}
+
+#Optimization function
+lambda_NLL <- function(lambda, x = D$pow.obs.norm){
+  y <- Trans.eq1(lambda, x)
+  NLL <- -as.numeric(shapiro.test(y)$statistic)
+  return(NLL)
+}
+
+theta.hat <- nlminb(start = 0.2, objective = lambda_NLL)
+#round to two decimal points.
+lambda <- round(theta.hat$par, 2)
+
+#Check qqplot:
+par(mfrow = c(1,2))
+y <- Trans.eq1(lambda, D$pow.obs.norm)
+qqnorm(y)
+qqline(y)
+hist(y)
+```
+**Change of variable**
+
+In order to calculate the new likelihood function for the transformed pow.obs, we use change of variable.
+
+
+##### No Transformation
+Fit an exponential, gamma and beta distribution to the observed wind power data.
+```{r}
+par.exp <- nlminb(start = 0.2, objective = testDistribution,
+                  distribution = "exponential",
+                  x = D$pow.obs.norm)
+
+par.exp$objective
+
+par.beta <- nlminb(start = c(2,5)
+                   , objective = testDistribution
+                   , distribution = "beta"
+                   , x = D$pow.obs.norm
+                   , lower = c(0,0.8))
+par.beta$objective
+
+par.gamma <- nlminb(start = c(2,5)
+                    ,objective = testDistribution
+                    ,distribution = "gamma"
+                    ,x = D$pow.obs.norm)
+par.gamma$objective
+
+#Sampling from the found beta distribution
+D$simdata <- rbeta(length(D$pow.obs.norm), shape1 = par.beta$par[1]
+                   ,shape2 = par.beta$par[2])
+sam.plot.pow.beta <- ggplot(D)+
+  geom_histogram(aes(x = pow.obs.norm, y =..density..), colour = "white", alpha = 0.6)+
+  geom_histogram(aes(x = simdata, y =..density..), alpha = 0.2, fill = "blue")+
+  theme_bw()+
+  ylim(c(0,10))+
+  stat_function(fun = dbeta, n = length(D$pow.obs.norm), args = list(shape1 = par.beta$par[1],shape2 = par.beta$par[2]))
+
+#Sampling from the found exp distribution
+D$simdata <- rexp(length(D$pow.obs.norm), rate = par.exp$par)
+sam.plot.pow.exp <- ggplot(D)+
+  geom_histogram(aes(x = pow.obs.norm, y = ..density..))+
+  geom_histogram(aes(x = simdata, y = ..density..)
+                 , alpha = 0.2, fill = "blue")+
+  theme_bw()+
+  stat_function(fun = dexp, n = length(D$pow.obs.norm), args = list(rate = par.exp$par))
+
+#Sampling from the found gamma distribution
+D$simdata <- rgamma(length(D$pow.obs.norm), shape = par.gamma$par[1], rate = par.gamma$par[2])
+sam.plot.pow.gamma <- ggplot(D)+
+  geom_histogram(aes(x = pow.obs.norm, y = ..density..))+
+  geom_histogram(aes(x = simdata, y = ..density..)
+                 , alpha = 0.2, fill = "blue")+
+  theme_bw()+
+  ylim(c(0,10))+
+  stat_function(fun = dgamma, n = length(D$pow.obs.norm), args = list(shape = par.gamma$par[1], rate = par.gamma$par[2]))
+
+grid.arrange(sam.plot.pow.beta, sam.plot.pow.exp, sam.plot.pow.gamma, ncol = 3)
+
+#Remove simulated data from the data frame
+D <- D %>%
+  dplyr::select(-simdata)
+```
+
+For wind speed distributions it is common practice to use the weibull distribution.
+```{r}
+par.ws30 <- nlminb(start = c(1,1), objective = testDistribution
+                   , x = D$ws30
+                   , distribution = "weibull"
+                   , lower = c(0,0))
+
+
+ggplot(D)+
+  geom_histogram(aes(x = ws30, y = ..count../sum(..count..))
+                 , colour = "white"
+                 , bins = 30)+
+  theme_bw()+
+  stat_function(fun = dweibull, n = dim(D)[1], args = list(shape = par.ws30$par[1], scale = par.ws30$par[2]))
+
+```
+
+Wind direction are supplied as radians in the dataset, and thus it is appropriate to fit circular distributions to this variable. Here we examine a circular normal distribution, wrapped cauchy and a von Mises distribution.
+```{r}
+nll.wrappedNormal <- function(p,x){
+  nll <- -sum(log(dwrappednormal(x, mu = circular(p[1]), rho = NULL, sd = p[2])))
+  return(nll)
+}
+
+nll.wrappedCauchy <- function(p,x){
+  nll <- -sum(log(dwrappedcauchy(x, mu = circular(p[1]), rho = p[2])))
+  return(nll)
+}
+
+nll.vonMises <- function(p,x){
+  nll <- -sum(dvonmises(x, mu = circular(p[1]), kappa = p[2], log = T))
+  return(nll)
+}
+
+wrapped.par <- nlminb(start = c(2,1), objective = nll.wrappedNormal, x = D$wd30)
+wrapped.cauc.par <- nlminb(start = c(1,1/10000), lower = c(-Inf, 1/10000), upper = c(Inf, 1),
+                           objective = nll.wrappedCauchy, x = D$wd30)
+wrapped.vonMises <- nlminb(start = c(0,1), objective = nll.vonMises, x = D$wd30, lower = c(-1000, 0))
+
+ggplot(D)+
+  theme_bw()+
+  #geom_density(aes(x = wd30.centered, y = ..density..), alpha = .8, colour = "white", fill = "red", colour = "white")+
+  geom_histogram(aes(x = wd30, y = ..density..), colour = "white", alpha = .4, fill = "blue", bins = 20)+
+  scale_x_continuous(breaks = c(0,pi/2,pi,3/2*pi,2*pi)
+                     , labels =c("0", "pi/2", "pi", "3/2pi", "2pi"))+
+  #stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = par.wd30$par[1], sd = par.wd30$par[2]))+
+  stat_function(fun = dwrappednormal, n = dim(D)[1], args = list(mu = wrapped.par$par[1], sd = wrapped.par$par[2]), aes(colour = "Wrapped Normal"))+
+  stat_function(fun = dwrappedcauchy, n = dim(D)[1], args = list(mu = wrapped.cauc.par$par[1],rho = wrapped.cauc.par$par[2]), aes(colour = "Wrapped Cauchy"))+
+  #stat_function(fun = dwrappedcauchy, n = dim(D)[1], args = list(mu = -1.5748695, rho = 0.2751607), aes(colour = "Wrapped Cauchy2"))+
+  stat_function(fun = dvonmises, n = dim(D)[1], args = list(mu = wrapped.vonMises$par[1], kappa = wrapped.vonMises$par[2]), aes(colour = "Von Mises"))+
+  labs(x = "Wind Direction", colour = "")+
+  scale_colour_manual(values = c("yellow", "red", "black", "blue"))
+
+#Calculate AICs
+print(paste0("AIC wrapped normal: ", round(-2*log(exp(-wrapped.par$objective     ))+2*2,4), "|"
+            ,"AIC wrapped cauchy: ", round(-2*log(exp(-wrapped.cauc.par$objective))+2*2,4), "|"
+            ,"AIC von Mises: "     , round(-2*log(exp(-wrapped.vonMises$objective))+2*2,4)))
+```
+
+
+#### Conclude on the most appropriate model for each variable, also report parameters including assessment of their uncertainty. For models that does not include a transformation you should also give an assessment of the uncertainty of the expected value in the model.
+
+```{r}
+## CI ## WIND POWER
+par(mfrow=c(1,1))
+alpha <- 0.05
+c <- exp(-0.5 * qchisq(1-alpha, df = 1))
+#likelihood-based
+mle.pow <- par.beta$par
+
+pow.fun <- function(shape1, shape2, data){
+  return( prod( dbeta(x = data, shape1 = shape1, shape2 = shape2, log = F) ) )
+}
+
+l.pow.fun <- function(shape1, shape2, data){
+  return( sum( dbeta(x = data, shape1 = shape1, shape2 = shape2, log = T) ) )
+}
+
+CIfun.pow <- function(y, first = T){##### T for shape, F for scale
+  if(first){
+    return( sum( dbeta(x = D$pow.obs.norm, shape1 = mle.pow[1], shape = mle.pow[2], log = T) ) -
+      sum( dbeta(x = D$pow.obs.norm, shape1 = y, shape2 = mle.pow[2], log = T) ) - 
+      0.5 * qchisq(1-alpha, df = 1) )
+  } else {
+    return( sum( dbeta(x = D$pow.obs.norm, shape1 = mle.pow[1], shape = mle.pow[2], log = T) ) -
+      sum( dbeta(x = D$pow.obs.norm, shape1 = mle.pow[1], shape2 = y, log = T) ) - 
+      0.5 * qchisq(1-alpha, df = 1) ) 
+  }
+}
+
+par(mfrow=c(1,2))
+shape1s <- seq(0, 1, by = 0.01)
+pow1 <- sapply(X = shape1s, FUN = pow.fun, data = D$pow.obs.norm, shape2 = mle.pow[2])
+plot(shape1s, pow1/max(pow1), col = 1, type = "l", xlab = expression(paste(alpha)),
+     main = "Parameter value shape1 for beta model of power production")
+CI.pow1 <- c(uniroot(f = CIfun.pow, interval = c(0, mle.pow[1]), first = T)$root,
+            uniroot(f = CIfun.pow, interval = c(mle.pow[1], 1), first = T)$root)
+lines(range(shape1s), c*c(1,1), col = 2)
+
+shape2s <- seq(1, 2, by = 0.01)
+pow2 <- sapply(X = shape2s, FUN = pow.fun, data = D$pow.obs.norm, shape1 = mle.pow[1])
+plot(shape2s, pow2/max(pow2), col = 1, type = "l", xlab = expression(paste(beta)),
+     main = "Parameter value shape2 for beta model of power production")
+CI.pow2 <- c(uniroot(f = CIfun.pow, interval = c(1, mle.pow[2]), first = F)$root,
+             uniroot(f = CIfun.pow, interval = c(mle.pow[2], 2), first = F)$root)
+lines(range(shape2s), c*c(1,1), col = 2)
+
+#wald
+n <- dim(D)[1]
+H.pow.shape1 <- hessian(l.pow.fun, mle.pow[1], shape2 = mle.pow[2], data = D$pow.obs.norm)
+V.pow.shape1 <- as.numeric(-1/H.pow.shape1)
+H.pow.shape2 <- hessian(l.pow.fun, mle.pow[2], shape1 = mle.pow[1], data = D$pow.obs.norm)
+V.pow.shape2 <- as.numeric(-1/H.pow.shape2)
+wald.pow.shape1 <- mle.pow[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.pow.shape1)
+wald.pow.shape2 <- mle.pow[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.pow.shape2)
+
+## CI ## WIND SPEED
+par(mfrow=c(1,2))
+#likelihood-based
+mle.ws30.weib <- par.ws30$par
+
+ws30.fun <- function(shape, scale, data){#####
+  prod(dweibull(x = data, shape = shape, scale = scale, log = F)*2)#to not get full zeros
+}
+
+l.ws30.fun <- function(shape, scale, data){#####
+  sum(dweibull(x = data, shape = shape, scale = scale, log = T))
+}
+
+CIfun.ws30 <- function(y, shape = T){##### T for shape, F for scale
+  if(shape){
+    sum(dweibull(x = D$ws30, shape = mle.ws30.weib[1], scale = mle.ws30.weib[2], log = T)) -
+      sum(dweibull(x = D$ws30, shape = y, scale = mle.ws30.weib[2], log = T)) - 
+      0.5 * qchisq(1-alpha, df = 1)
+  } else {
+    sum(dweibull(x = D$ws30, shape = mle.ws30.weib[1], scale = mle.ws30.weib[2], log = T)) -
+      sum(dweibull(x = D$ws30, shape = mle.ws30.weib[1], scale = y, log = T)) - 
+      0.5 * qchisq(1-alpha, df = 1) 
+  }
+}
+shapes <- seq(1, 3.5, by = 0.1)
+ws30.shape <- sapply(X = shapes, FUN = ws30.fun, scale = mle.ws30.weib[2], data = D$ws30)
+plot(shapes, ws30.shape/max(ws30.shape), col = 1, type = "l", xlab = "shape, k",
+     main = "Parameter value for shape for weibull model of wind speed")
+CI.ws30.shape <- c(uniroot(f = CIfun.ws30, interval = c(1, mle.ws30.weib[1]), shape = T)$root,
+                   uniroot(f = CIfun.ws30, interval = c(mle.ws30.weib[1], 3.5), shape = T)$root)
+lines(range(shapes), c*c(1,1), col = 2)
+
+scales <- seq(7, 12, by = 0.1)
+ws30.scale <- sapply(X = scales, FUN = ws30.fun, shape = mle.ws30.weib[1], data = D$ws30)
+plot(scales, ws30.scale/max(ws30.scale), col = 1, type = "l", xlab = expression(paste("scale, ", lambda)),
+     main = "Parameter value for scale for weibull model of wind speed")
+CI.ws30.scale <- c(uniroot(f = CIfun.ws30, interval = c(7, mle.ws30.weib[2]), shape = F)$root,
+                   uniroot(f = CIfun.ws30, interval = c(mle.ws30.weib[2], 12), shape = F)$root)
+lines(range(scales), c*c(1,1), col = 2)
+
+#wald
+n <- dim(D)[1]
+H.ws30.shape <- hessian(l.ws30.fun, mle.ws30.weib[1], scale = mle.ws30.weib[2], data = D$ws30)
+V.ws30.shape <- as.numeric(-1/H.ws30.shape)
+H.ws30.scale <- hessian(l.ws30.fun, mle.ws30.weib[2], shape = mle.ws30.weib[1], data = D$ws30)
+V.ws30.scale <- as.numeric(-1/H.ws30.scale)
+wald.ws30.shape <- mle.ws30.weib[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30.shape)
+wald.ws30.scale <- mle.ws30.weib[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30.scale)
+
+
+## CI ## WIND DIRECTION
+par(mfrow=c(1,2))
+#likelihood-based
+mle.wd30 <- wrapped.cauc.par$par
+
+wd30.fun <- function(mu, rho, data){#####
+  prod(dwrappedcauchy(x = data, mu = mu, rho = rho))
+}
+
+l.wd30.fun <- function(mu, rho, data){#####
+  sum( log( dwrappedcauchy(x = data, mu = mu, rho = rho) ) )
+}
+
+CIfun.wd30 <- function(y, mu = T){##### T from mean, F for sigma
+  if(mu){
+    return( sum( log( dwrappedcauchy(x = D$wd30, mu = mle.wd30[1], rho = mle.wd30[2]) ) ) -
+      sum( log( dwrappedcauchy(x = D$wd30, mu = y, rho = mle.wd30[2]) ) ) -
+      0.5 * qchisq(1-alpha, df = 1) )
+  } else {
+    return( sum( log( dwrappedcauchy(x = D$wd30, mu = mle.wd30[1], rho = mle.wd30[2]) ) ) - 
+      sum( log( dwrappedcauchy(x = D$wd30, mu = mle.wd30[1], rho = y) ) ) -
+      0.5 * qchisq(1-alpha, df = 1) )
+  }
+}
+
+mus <- seq(-2.5, -1, by = 0.01)
+wd30.mu <- sapply(X = mus, FUN = wd30.fun, rho = mle.wd30[2], data = D$wd30)
+plot(mus, wd30.mu/max(wd30.mu), col = 1, type = "l", xlab = expression(paste("peak, ", mu)),
+     main = "Parameter value for peak for wrapped cauchy model of wind direction")
+CI.wd30.mu <- c(uniroot(f = CIfun.wd30, interval = c(-2.5, mle.wd30[1]), mu = T)$root,
+                uniroot(f = CIfun.wd30, interval = c(mle.wd30[1], -1), mu = T)$root)
+lines(range(mus), c*c(1,1), col = 2)
+
+rhos <- seq(0, 0.5, by = 0.005)
+wd30.rho <- sapply(X = rhos, FUN = wd30.fun, mu = mle.wd30[1], data = D$wd30)
+plot(rhos, wd30.rho/max(wd30.rho), col = 1, type = "l", xlab = expression(paste("concentration, ", rho)),
+     main = "Parameter value for concentration factor for wrapped cauchy model of wind direction")
+CI.wd30.rho <- c(uniroot(f = CIfun.wd30, interval = c(0, mle.wd30[2]), mu = F)$root,
+                   uniroot(f = CIfun.wd30, interval = c(mle.wd30[2], 0.5), mu = F)$root)
+lines(range(rhos), c*c(1,1), col = 2)
+
+#wald
+n <- dim(D)[1]
+H.wd30.mu <- hessian(l.wd30.fun, mle.wd30[1], rho = mle.wd30[2], data = D$wd30)
+V.wd30.mu <- as.numeric(-1/H.wd30.mu)
+H.wd30.rho <- hessian(l.wd30.fun, mle.wd30[2], mu = mle.wd30[1], data = D$wd30)
+V.wd30.rho <- as.numeric(-1/H.wd30.rho)
+wald.wd30.mu <- mle.wd30[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.wd30.mu)
+wald.wd30.rho <- mle.wd30[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.wd30.rho)
+
+#All CIs of parameters
+round( rbind( CI.pow1, wald.pow.shape1, CI.pow2, wald.pow.shape2, mle.pow,
+              CI.ws30.shape, wald.ws30.shape, CI.ws30.scale, wald.ws30.scale, mle.ws30.weib, 
+              CI.wd30.mu, wald.wd30.mu, CI.wd30.rho, wald.wd30.rho, mle.wd30 ), digits = 3 )
+
+alpha <- par.beta$par[1]; beta <- par.beta$par[2]
+#Beta: E[X] = alpha/(alpha + beta), Var[X] = alpha*beta/((alpha+beta)^2*(alpha+beta+1))
+E.pow.obs <- alpha/(alpha + beta)
+CI.E.pow.obs <- alpha/(alpha + beta) + c(-1,1) * qnorm(1-alpha/2) * alpha*beta/((alpha+beta)^2*(alpha+beta+1)) * 1/dim(D)[1]
+#(CI.E.pow.obs <- mean(D$pow.obs.norm) + c(-1,1) * qnorm(1-alpha/2) * sd(D$pow.obs.norm) / dim(D)[1])
+
+#Weibull: E[X] = lambda * gamma(1+1/k); Var[X] = lambda^2*(gamma(1+2/k) - (gamma(1+1/k))^2)
+#par.ws30$par[2]*gamma(1+1/par.ws30$par[1]) #mean = lambda * Gamma(1 + 1/k); lambda = scale, k = shape
+scale <- par.ws30$par[2]; shape <- par.ws30$par[1]
+E.ws30 <- scale*gamma(1+1/shape)
+V.ws30 <- scale^2*(gamma(1+2/shape) - (gamma(1+1/shape))^2)
+CI.E.ws30 <- E.ws30 + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30) / dim(D)[1] #according to Central Limit Theorem
+#(CI.E.ws30 <- mean(D$ws30) + c(-1,1) * qnorm(1-alpha/2) * sd(D$ws30) / dim(D)[1])
+
+#Wrapped Cauchy: E[X] = mu, Var[X] = 1 - exp(-gamma)
+#relationship between rho and gamma: gamma = -ln(rho)
+mu <- wrapped.cauc.par$par[1]; gamma = -log(wrapped.cauc.par$par[2])
+(E.wd30 <- mu)
+(V.wd30 <- 1 - exp(-gamma)) #or 1 - rho
+(CI.E.wd30 <- E.wd30 + c(-1,1) * qnorm(1-alpha/2) *V.wd30 / dim(D)[1]) #according to Central Limit Theorem
+#(CI.E.wd30 <- mle.wd30[1] + c(-1,1) * qnorm(1-alpha/2) * sd(D$wd30) / dim(D)[1]) #mean(D$wd30) instead gives another result
+
+round(rbind(c(CI.E.pow.obs[1], 1/par.exp$par, CI.E.pow.obs[2]) , c(CI.E.ws30[1], E.ws30, CI.E.ws30[2]) , c(CI.E.wd30[1], mle.wd30[1], CI.E.wd30[2])), digits=5)
+
+par(mfrow=c(1,3))
+
+temp1 <- paste("alpha == ", mle.pow[1]) #par.beta$par[1]
+temp2 <- paste("beta == ", mle.pow[2]) #par.beta$par[2]
+temp <- c(temp1, temp2)
+
+ggplot(D)+
+  geom_histogram(aes(x = pow.obs.norm, y = ..density..), colour='white', alpha=0.6, bins=30)+
+  theme_bw()+
+  stat_function(fun = dbeta, n = dim(D)[1], args = list(shape1 = mle.pow[1], shape2 = mle.pow[2]))+
+  ylim(c(0,10))+
+  annotate( "text", x = 4/5*max(D$pow.obs.norm), y = c(9.5, 9.0), label = temp, parse = T  ) +
+  ggtitle("Beta distribution and distribution of normalized power production")
+
+temp1 <- paste("k == ", mle.ws30.weib[1]) #par.ws30$par[1]
+temp2 <- paste("lambda == ", mle.ws30.weib[2]) #par.ws30$par[2]
+temp <- c(temp1, temp2)
+
+ggplot(D)+
+  geom_histogram(aes(x = ws30, y = ..count../sum(..count..)) , colour = "white", alpha=0.6, bins = 30)+
+  theme_bw()+
+  stat_function(fun = dweibull, n = dim(D)[1], args = list(shape = par.ws30$par[1], scale = par.ws30$par[2])) +
+  annotate( "text", x = 4/5*max(D$ws30), y = c(0.09,0.085), label = temp, parse = T  ) +
+  ggtitle("Weibull distribution and distribution of the wind speed")
+
+temp1 <- paste("mu ==", mle.wd30[1]) #wrapped.cauc.par$par[1]
+temp2 <- paste("rho ==", mle.wd30[2]) #wrapped.cauc.par$par[2]
+temp <- c(temp1, temp2)
+
+ggplot(D)+
+  theme_bw()+
+  geom_histogram(aes(x = wd30, y = ..density..), colour = "white", alpha = 0.6, bins = 20)+
+  scale_x_continuous(breaks = c(0,pi/2,pi,3/2*pi,2*pi)
+                     , labels =c("0", "pi/2", "pi", "3/2pi", "2pi"))+
+  stat_function(fun = dwrappedcauchy, n = dim(D)[1], args = list(mu = wrapped.cauc.par$par[1], rho = 0.36))+
+  annotate( "text", x = 1/5*max(D$wd30), y = c(0.35, 0.325), label = c(temp1,temp2), parse = T  ) +
+  ggtitle("Wrapped cauchy distribution and distribution of the wind direction")
+
+```
