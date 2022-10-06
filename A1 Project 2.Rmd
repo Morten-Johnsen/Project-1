@@ -32,6 +32,8 @@ if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
 } else {
   setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
 }
+
+source("testDistribution.R")
 ```
 
 ## Projekt 2: Survival Data
@@ -40,6 +42,7 @@ if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
 
 #### Read the data Logistic.txt into R.
 
+
 ```{r}
 log.data <- read.table("Logistic.txt", header=TRUE, sep="", 
                        as.is=TRUE)
@@ -47,9 +50,9 @@ log.data <- read.table("Logistic.txt", header=TRUE, sep="",
 str(log.data)
 ```
 
-#### Fit the Binomial distribution to the data (i.e. consider all data as com-
-ing from the same population)
+#### Fit the Binomial distribution to the data (i.e. consider all data as coming from the same population)
 
+Fitting a binomial distribution to the full dataset and thus implicitly assuming no effect of the treatment:
 ```{r}
 #all data from one population:
 bin.par <- nlminb(start = 0.1, objective = testDistribution
@@ -58,8 +61,9 @@ bin.par <- nlminb(start = 0.1, objective = testDistribution
 ```
 
 
-#### Fit the Binomial separately to the two distributions and test if there is a difference between the groups.
+#### Fit the Binomial separately to the two distributions and test if there is a difference between the groups
 
+Fitting the binomial separately to the two groups (treatment, no treatment):
 ```{r}
 #separately for the groups
 x.AZT <- log.data %>%
@@ -94,39 +98,72 @@ e.nA.AZT <- log.data$n[log.data$AZT == "Yes"]*(1-p.hat)
 e.nA.no_AZT <- log.data$n[log.data$AZT == "No"]*(1-p.hat)
 
 e <- c(e.A.AZT, e.A.no_AZT, e.nA.AZT, e.nA.no_AZT)
-#by hand
-chi_squared <- sum((c(log.data$AIDS_yes,log.data$n-log.data$AIDS_yes)-e)^2/e)
-(chi_squared)
-#probability of observing this chi-squared test statistic given that the null-hypothesis is true
-rows <- dim(log.data)[1]
-columns <- dim(log.data)[2]-1 #-1 because of the AZT column
-pchisq(chi_squared,df=(rows-1)*(columns-1),lower.tail=FALSE)
 
-#WITH CONTINUITY CORRECTION:
+#### Without Continuity Correction: ####
+#chi_squared <- sum((c(log.data$AIDS_yes,log.data$n-log.data$AIDS_yes)-e)^2/e)
+#(chi_squared)
+#probability of observing this chi-squared test statistic given that the null-hypothesis is true
+#rows <- dim(log.data)[1]
+#columns <- dim(log.data)[2]-1 #-1 because of the AZT column
+#pchisq(chi_squared,df=(rows-1)*(columns-1),lower.tail=FALSE)
+
+#### WITH CONTINUITY CORRECTION (correct): ####
 #https://en.wikipedia.org/wiki/Yates%27s_correction_for_continuity
 chi_squared_yates <- sum((abs(c(log.data$AIDS_yes,log.data$n-log.data$AIDS_yes)-e)-0.5)^2/e)
-(chi_squared_yates)
 #probability of observing this chi-squared test statistic given that the null-hypothesis is true
 rows <- dim(log.data)[1]
 columns <- dim(log.data)[2]-1 #-1 because of the AZT column
-pchisq(chi_squared_yates,df=(rows-1)*(columns-1),lower.tail=FALSE)
-
-#direct using R:
-log.data.for.chi <- log.data; log.data.for.chi$f <- log.data.for.chi$n - log.data.for.chi$AIDS_yes
-prop.test(log.data$AIDS_yes, log.data$n)
-#or
-chisq.test(as.matrix(log.data.for.chi[,c(2,4)]))
+cat(paste("chi_squared test statistic: ", chi_squared_yates, "\nP-value: ", pchisq(chi_squared_yates,df=(rows-1)*(columns-1),lower.tail=FALSE),
+          "\nThus there is a significant difference between the two groups. "))
 ### Result: There's a difference between the two groups.
-print(paste0("Mean p for group with AZT treatment: ", round(AZT.par$par,3)))
-print(paste0("Mean p for group with no AZT treatment: ", round(no.AZT.par$par,3)))
+
+#### direct test of proportions using R: ####
+#log.data.for.chi <- log.data; log.data.for.chi$f <- log.data.for.chi$n - log.data.for.chi$AIDS_yes
+#prop.test(log.data$AIDS_yes, log.data$n)
+#or
+#chisq.test(as.matrix(log.data.for.chi[,c(2,4)]))
 ```
 
 Result: There is a statistically significant effect of the treatment.
+
+Calculating MLE and uncertainty for $p_0$ and $p_1$:
+
+```{r}
+#Using the Wald statistic:
+pf.p <- function(p, y){
+  nll <- testDistribution(p, y, distribution = "binomial")
+  return(nll)
+}
+#For p0
+hessian.p0 <- hessian(func = pf.p, x = no.AZT.par$par, y = c(x.no.AZT[1], x.no.AZT[2]))
+sd.p0 <- sqrt(diag(solve(hessian.p0)))
+CI.p0 <- no.AZT.par$par + c(-1,1)*qnorm(0.975)*sd.p0
+
+#For p1
+hessian.p1 <- hessian(func = pf.p, x = AZT.par$par, y = c(x.AZT[1], x.AZT[2]))
+sd.p1 <- sqrt(diag(solve(hessian.p1)))
+CI.p1 <- AZT.par$par + c(-1,1)*qnorm(0.975)*sd.p1
+
+print(cat("MLE of p_1 and 95% CI for group with AZT treatment: ", round(AZT.par$par,3), " [",round(CI.p1,3)[1],"; ",round(CI.p1,3)[2],"]"
+      ,"\nMLE of p_0 and 95% CI for group with no AZT treatment: ", round(no.AZT.par$par,3), " [",round(CI.p0,3)[1],"; ",round(CI.p0,3)[2],"]"))
+```
+
+```{r, warnings = F, messages = F}
+#Profile likelihoods to ensure that the Wald CI is an appropriate approximation.
+```
+
 
 #### Estimate parameters in the model (p0 probability of AIDS in control group, p1 probability of AIDS in treatment group) and report a confidence interval for the parameter describing the difference, compare with the result above.
 
 
 Here $p_0$ indicate the risk of developing AIDS in the control group and $p_1$ indicate the risk of developing AIDS in the AZT treatment group.
+
+$$
+p_0 = \dfrac{e^{\beta_0}}{1+e^{\beta_0}}
+$$
+$$
+p_1 = \dfrac{e^{\beta_0 + \beta_1}}{1+e^{\beta_0+\beta_1}}
+$$
 
 ```{r}
 #Estimate parameters in the model and report a confidence interval for the parameter 
@@ -156,21 +193,29 @@ beta_1 <- opt.p_1$par
 
 (p_0 <- exp(beta_0)/(1 + exp(beta_0)))
 (p_1 <- exp(beta_0 + beta_1) / (1 + exp(beta_0 + beta_1)))
+```
 
-log.data
+
+Comparing the results to the glm model i R:
+
+```{r}
 logistic <- data.frame("AZT" = c(rep(1,170), rep(0,168))
                        ,"AIDS_yes" = c(rep(c(1,0),c(25,170-25)), rep(c(1,0), c(44, 168-44))))
 
 fit.glm <- glm(AIDS_yes ~ AZT, data = logistic, family = binomial)
-print(paste0("with glm model: ", coef(fit.glm)))
-print(paste0("By hand (according to slide 19 lect 4): "))
-print(paste0("beta_0 = ", beta_0, ", beta_1 = ", beta_1))
-summary(fit.glm)
+print(cat(paste0("with glm model: ", coef(fit.glm)
+  ,"\nBy hand (according to slide 19 lect 4): "
+  ,"\nbeta_0 = ", beta_0, ", beta_1 = ", beta_1)))
+#summary(fit.glm)
+```
 
-#results show: -0.72 logits(?) for developing AIDS when using the treatment
 
-# Confidence interval for the two beta parameters. 
-#calculate profile likelihoods
+##### Calculating confidence intervals for the two beta parameters
+
+Below can be seen the profile likelihood curves for the $p_0$ and $p_1$ estimates.
+
+```{r}
+#Profile likelihoods
 prof.b0 <- function(beta0, x = log.data$AIDS_yes[2], n = log.data$n[2]){
   p <- exp(beta0)/(1+exp(beta0))
   return(-sum(dbinom(x, size = n, prob = p, log = T)))
@@ -180,10 +225,13 @@ prof.b1 <- function(beta1, beta0, x = log.data$AIDS_yes[1], n = log.data$n[1]){
   p <- exp(beta0+beta1)/(1+exp(beta0+beta1))
   return(-sum(dbinom(x, size = n, prob = p, log = T)))
 }
+#beta intervals for examination
 beta.zero.sims <- seq(-1.5,-0.6,0.01)
 beta.one.sims <- seq(-1.3,-0.2,0.01)
+#calculate profile likelihoods
 pL.b0 <- sapply(beta.zero.sims, FUN = prof.b0)
 pL.b1 <- sapply(beta.one.sims, FUN = prof.b1, beta0 = beta_0)
+#plots
 par(mfrow=c(1,2))
 plot(beta.zero.sims
      , -(pL.b0+max(-pL.b0))
@@ -200,6 +248,7 @@ abline(h = -qchisq(0.95, df = 1)/2, lty = "dashed")
 From these figures it can be concluded that the quadratic approximation of the CI through use of Fischers information matrix, is a sufficiently good approximation.
 
 The Wald and likelihood-based confidence intervals for the two $\beta_i, i\in (0,1)$ parameters can be seen printed below.
+
 ```{r}
 sd_0 <- as.numeric(sqrt(solve(hessian(beta_0, func = nll.p_0))))
 sd_1 <- as.numeric(sqrt(solve(hessian(beta_1, func = nll.p_1, beta_0 = beta_0))))
@@ -222,7 +271,7 @@ cat(paste("Wald Confidence intervals:"
       ,paste0("\nbeta_0 = ", round(beta_1, 4), " [95% CI: ", CI.1[1],", ", CI.1[2],"]")))
 ```
 
-Comparing these to eachother, we see that the Wald CI is a very good approximation of the actual CIs. However, when comparing the estimates from our glm model we see that the $95\%$ CI for AZT is wider for the model estimate...
+Comparing these to eachother, we see that the Wald CI is a very good approximation of the actual CIs. However, when comparing the estimates to our glm model we see that the $95\%$ CI for AZT is wider for the model estimate...
 
 ```{r}
 confint(fit.glm)
@@ -547,7 +596,7 @@ confint(fit)
 
 Same as the wald CI. The likelihood based CI is a bit more narrow.
 
-#### Derive the theoretical results for the models above, including the standard error estimates, use this to formulate and implement the profile likelihood function for the treatment parameter
+#### Derive the theoretical results for the models above, including the standard error estimates, use this to formulate and implement the profile likelihood function for the treatment parameter.
 
 ```{r}
 par(mfrow = c(1,2))
