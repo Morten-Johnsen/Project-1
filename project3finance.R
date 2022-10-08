@@ -11,6 +11,8 @@ library(emg)
 library(numDeriv)
 library(rlang)
 library(extraDistr)
+library(fitdistrplus)
+library(SMPracticals)
 #setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
 setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
 D <- read.table("finance_data.csv", header=TRUE, sep=";", 
@@ -64,7 +66,7 @@ lcauchyFUNC <- function(p, data){
   return(-sum(dcauchy(x = data, location = x0, scale = gam, log = T)))
 }
 llstFUNC <- function(p, data){ #location-scale t-distribution
-  return(-sum(dlst(x = data, df = p[1], mu = p[2], sigma=p[3], log = T)))
+  return(-sum(dlst(x = data, df = p[1], mu = p[2], sigma = p[3], log = T)))
 }
 
 lsnFUNC <- function(p, data){ #skewed normal dist
@@ -104,7 +106,7 @@ ggplot(D)+
   stat_function(fun = dcauchy, n = dim(D)[1], args = list(location = par.cauchy$par[1],
                                                           scale = par.cauchy$par[2]), aes(colour = "cauchy")) +
   stat_function(fun = dlst, n = dim(D)[1], args = list(df = par.lst$par[1], mu = par.lst$par[2],
-                                                       sigma = par.lst$par[3]), aes(colour = "t")) +
+                                                       sigma = par.lst$par[3]), aes(colour = "lst")) +
   stat_function(fun = dsn, n = dim(D)[1], args = list(xi = par.sn$par[1], omega = par.sn$par[2],
                                                       alpha = par.sn$par[3]), aes(colour = "sn")) +
   stat_function(fun = dgnorm, n = dim(D)[1], args = list(mu = par.gn$par[1], alpha = par.gn$par[2],
@@ -330,3 +332,121 @@ ggplot(D)+
                                                          beta = par.gn$par[3]), color = 'red') +
   annotate( "text", x = 2.7/5*max(D$SLV), y = c(10.5, 10.0, 9.4), label = c(temp1,temp2,temp3), parse = T  ) +
   ggtitle("Generalized normal distribution and distribution of the weekly returns")
+
+#####Likelihood based CI for location-scale t-distribution
+mle.lst <- par.lst$par
+
+#lstFUNC w/ NLL = T, negative log-likelihood using p's
+
+#lstFUNC w/ NLL = F, log-likelihood using p's
+
+lstFUNC <- function(df, mu, sigma, data, log = F){
+  if(!log){
+    return(prod(dlst(x = data, df = df, mu = mu, sigma = sigma, log = F) / 2)) #to avoid inf values
+  } else {
+    return(sum(dlst(x = data, df = df, mu = mu, sigma = sigma, log = T)))
+  }
+}  
+
+
+CIfun.lst <- function(y, data, p = "df"){##### T from mean, F for sigma
+  if(p == "df"){
+    sum(dlst(x = data, df = mle.lst[1], mu = mle.lst[2], sigma = mle.lst[3], log = T)) -
+      sum(dlst(x = data, df = y, mu = mle.lst[2], sigma = mle.lst[3], log = T)) - 
+      0.5 * qchisq(1-alpha, df = 1)
+  } else if(p == "mu") {
+    sum(dlst(x = data, df = mle.lst[1], mu = mle.lst[2], sigma = mle.lst[3], log = T)) -
+      sum(dlst(x = data, df = mle.lst[1], mu = y, sigma = mle.lst[3], log = T)) - 
+      0.5 * qchisq(1-alpha, df = 1)
+  } else { #p == "sigma"
+    sum(dlst(x = data, df = mle.lst[1], mu = mle.lst[2], sigma = mle.lst[3], log = T)) -
+      sum(dlst(x = data, df = mle.lst[1], mu = mle.lst[2], sigma = y, log = T)) - 
+      0.5 * qchisq(1-alpha, df = 1)
+  }
+}
+###PROFILE likelihoods
+par(mfrow = c(1,3))
+#df
+dfs.lst <- seq(mle.lst[1]-2.5, mle.lst[1]+4.25, by = 0.0001)
+df.lst <- sapply(X = dfs.lst, FUN = lstFUNC, mu = mle.lst[2], sigma = mle.lst[3], data = D$SLV, log = F)
+plot(dfs.lst, df.lst/max(df.lst), col = 1, type = "l", xlab = "df",
+     main = "Parameter value for df for location-scale t-distribution model of SLV")
+CI.df.lst <- c(uniroot(f=CIfun.lst, interval = c(min(dfs.lst), mle.lst[1]), data = D$SLV, p = "df")$root,
+               uniroot(f=CIfun.lst, interval = c(mle.lst[1], max(dfs.lst)), data = D$SLV, p = "df")$root)
+lines(range(dfs.lst), c*c(1,1), col = 2)
+#mu
+mus.lst <- seq(mle.lst[2]-0.01, mle.lst[2]+0.01, by = 0.00001)
+mu.lst <- sapply(X = mus.lst, FUN = lstFUNC, df = mle.lst[1], sigma = mle.lst[3], data = D$SLV, log = F)
+plot(mus.lst, mu.lst/max(mu.lst), col = 1, type = "l", xlab = expression(paste(mu)),
+     main = "Parameter value for location of location-scale t-distribution model of SLV")
+CI.mu.lst <- c(uniroot(f = CIfun.lst, interval = c(min(mus.lst), mle.lst[2]), data = D$SLV, p = "mu")$root,
+              uniroot(f = CIfun.lst, interval = c(mle.lst[2], max(mus.lst)), data = D$SLV, p = "mu")$root)
+lines(range(mus.lst), c*c(1,1), col = 2)
+#sigma
+sigmas.lst <- seq(mle.lst[3]-0.01,mle.lst[3]+0.01, by = 0.0001)
+sigma.lst <- sapply(X = sigmas.lst, FUN = lstFUNC, df = mle.lst[1], mu = mle.lst[2], data = D$SLV, log = F)
+plot(sigmas.lst, sigma.lst/max(sigma.lst), col = 1, type = "l", xlab = expression(paste(sigma)),
+     main = "Parameter value for scale for generalized normal model of SLV")
+CI.sigma.lst <- c(uniroot(f = CIfun.lst, interval = c(min(sigmas.lst), mle.lst[3]), data = D$SLV, p = "sigma")$root,
+                 uniroot(f = CIfun.lst, interval = c(mle.lst[3], max(sigmas.lst)), data = D$SLV, p = "sigma")$root)
+lines(range(sigmas.lst), c*c(1,1), col = 2)
+
+#Wald CIs
+n <- dim(D)[1]
+H.df.lst <- hessian(lstFUNC, mle.lst[1], mu = mle.lst[2], sigma = mle.lst[3], data = D$SLV, log = T)
+V.df.lst <- as.numeric(-1/H.df.lst)
+H.mu.lst <- hessian(lstFUNC, mle.lst[2], df = mle.lst[1], sigma = mle.lst[3], data = D$SLV, log = T)
+V.mu.lst <- as.numeric(-1/H.mu.lst)
+H.sigma.lst <- hessian(lstFUNC, mle.lst[3], df = mle.lst[1], mu = mle.lst[2], data = D$SLV, log = T)
+V.sigma.lst <- as.numeric(-1/H.sigma.lst)
+wald.df.lst <- mle.lst[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.df.lst)
+wald.mu.lst <- mle.lst[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.mu.lst)
+wald.sigma.lst <- mle.lst[3] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.sigma.lst)
+
+round( rbind(CI.mu.norm, wald.mu.norm, CI.sigmasq.norm, wald.sigmasq.norm, mle.norm.sq), digits = 5)
+round( rbind(CI.mu.gn, wald.mu.gn, CI.alpha.gn, wald.alpha.gn, CI.beta.gn, wald.beta.gn), digits=5 );round(rbind (mle.gn), digits = 5)
+round( rbind(CI.df.lst, wald.df.lst, CI.mu.lst, wald.mu.lst, CI.sigma.lst, wald.sigma.lst), digits=5);round( rbind(mle.lst), digits=5)
+
+temp1 <- paste("df == ", round(mle.lst[1], digits=2))
+temp2 <- paste("mu == ", round(mle.lst[2], digits=5))
+temp3 <- paste("sigma == ", round(mle.lst[3], digits=4))
+
+ggplot(D)+
+  geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
+  stat_function(fun = dlst, n = dim(D)[1], args = list(df = par.lst$par[1], mu = par.lst$par[2],
+                                                         sigma = par.lst$par[3]), color = 'red') +
+  annotate( "text", x = 2.7/5*max(D$SLV), y = c(10.5, 10.0, 9.5), label = c(temp1,temp2,temp3), parse = T  ) +
+  ggtitle("Location-scale t-distribution and distribution of the weekly returns")
+
+
+qqnorm2 <- function (y, line = FALSE, ...) #function is taken from package SMPracticals and was originally for qqexp :)
+{
+  y <- y[!is.na(y)]
+  n <- length(y)
+  x <- qnorm(c(1:n)/(n + 1))
+  m <- mean(y)
+  ylim <- c(min(y), max(y))
+  qqplot(x, y, xlab = "normal plotting position", ylim = ylim, 
+         ylab = "Ordered sample", ...)
+  if (line) 
+    abline(0, m, lty = 2)
+  invisible()
+}
+qqlst <- function (y, line = FALSE, ...)
+{
+  y <- y[!is.na(y)]
+  n <- length(y)
+  x <- qlst(c(1:n)/(n + 1), df=mle.lst[1])
+  m <- mean(y)
+  ylim <- c(min(y), max(y))
+  qqplot(x, y, xlab = "location-scale t-distribution plotting position", ylim = ylim, 
+         ylab = "Ordered sample", ...)
+  if (line) 
+    abline(0, m, lty = 2)
+  invisible()
+}
+par(mfrow=c(1,2))
+qqnorm(D$SLV)
+qqline(D$SLV)
+qqlst(D$SLV)
+qqline(D$SLV)
