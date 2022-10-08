@@ -10,6 +10,7 @@ library(gnorm)
 library(emg)
 library(numDeriv)
 library(rlang)
+library(extraDistr)
 #setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
 setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
 D <- read.table("finance_data.csv", header=TRUE, sep=";", 
@@ -62,13 +63,10 @@ lcauchyFUNC <- function(p, data){
   gam <- p[2] #scale R > 0
   return(-sum(dcauchy(x = data, location = x0, scale = gam, log = T)))
 }
-lpownormFUNC <- function(p, data){
-  alpha <- p
-  return(-sum(log(dpn(x = data, p))))
+llstFUNC <- function(p, data){ #location-scale t-distribution
+  return(-sum(dlst(x = data, df = p[1], mu = p[2], sigma=p[3], log = T)))
 }
-ltFUNC <- function(p, data){
-  return(-sum(dt(x = data, df = p, log = T)))
-}
+
 lsnFUNC <- function(p, data){ #skewed normal dist
   return(-sum(dsn(x = data, xi = p[1], omega = p[2], alpha = p[3], log = T)))
 }
@@ -94,8 +92,7 @@ lemgFUNC <- function(p, data){ #exponential modified gaussian dist
 }
 
 par.cauchy <- nlminb(start = c(0,1), objective = lcauchyFUNC, data = D$SLV)
-par.pownorm <- nlminb(start = 1, objective = lpownormFUNC, data = D$SLV)
-par.t <- nlminb(start = 1, objective = ltFUNC, data = D$SLV)
+par.lst <- nlminb(start = c(1,1,1), objective = llstFUNC, data = D$SLV)
 par.sn <- nlminb(start = c(1,1,1), objective = lsnFUNC, data = D$SLV)
 par.gn <- nlminb(start = c(1,1,1), objective = lgnFUNC, data = D$SLV)
 par.asgn <- nlminb(start = c(1,1,1), lower = c(-Inf, -Inf, 0), objective = lasgnFUNC, data = D$SLV)
@@ -106,15 +103,15 @@ ggplot(D)+
   stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = par$par[1], sd = par$par[2]), aes(colour = "norm")) +
   stat_function(fun = dcauchy, n = dim(D)[1], args = list(location = par.cauchy$par[1],
                                                           scale = par.cauchy$par[2]), aes(colour = "cauchy")) +
-  stat_function(fun = dpn, n = dim(D)[1], args = list(alpha = par.pownorm$par), aes(colour = "powernorm")) +
-  stat_function(fun = dt, n = dim(D)[1], args = list(df = par.t$par), aes(colour = "t")) +
+  stat_function(fun = dlst, n = dim(D)[1], args = list(df = par.lst$par[1], mu = par.lst$par[2],
+                                                       sigma = par.lst$par[3]), aes(colour = "t")) +
   stat_function(fun = dsn, n = dim(D)[1], args = list(xi = par.sn$par[1], omega = par.sn$par[2],
                                                       alpha = par.sn$par[3]), aes(colour = "sn")) +
   stat_function(fun = dgnorm, n = dim(D)[1], args = list(mu = par.gn$par[1], alpha = par.gn$par[2],
                                                          beta = par.gn$par[3]), aes(colour = "gnorm")) +
   stat_function(fun = demg, n = dim(D)[1], args = list(mu = par.emg$par[1], sigma = par.emg$par[2],
                                                        lambda = par.emg$par[3]), aes(colour = "emg"))+
-  scale_colour_manual(values = c("blue", "red", "yellow", "black", "pink", "grey", "purple"))+
+  scale_colour_manual(values = c("blue", "red", "yellow", "black", "grey", "purple"))+
   labs(colour = "Distribution")
 #legend('topright', legend=c('normal', 'cauchy', 'power normal', 't'), col=c('red', 'blue', 'green', 'yellow'))
 
@@ -122,9 +119,7 @@ AIC.norm <- -2 * sum(dnorm(x = D$SLV, mean = par$par[1], sd = par$par[2], log = 
 + 2 * length(par$par)
 AIC.cauchy <- -2 * sum(dcauchy(x = D$SLV, location = par.cauchy$par[1],
                                scale = par.cauchy$par[2], log = T)) + 2 * length(par.cauchy$par)
-AIC.pownorm <- -2 * sum(log(dpn(x = D$SLV, alpha = par.pownorm$par)))
-+ 2 * length(par.pownorm$par)
-AIC.t <- -2 * sum(dt(x=D$SLV, df = par.t$par, log = T)) + 2 * length(par.t$par)
+AIC.lst <- -2 * sum(dlst(x=D$SLV, df = par.lst$par[1], mu = par.lst$par[2], sigma = par.lst$par[3], log = T)) + 2 * length(par.lst$par)
 AIC.sn <- -2 * sum(dsn(x=D$SLV, xi = par.sn$par[1], omega = par.sn$par[2], alpha = par.sn$par[3], 
                        log = T)) + 2 * length(par.sn$par)
 AIC.gn <- -2 * sum(dgnorm(x=D$SLV, mu = par.gn$par[1], alpha = par.gn$par[2], beta = par.gn$par[3], 
@@ -135,7 +130,7 @@ AIC.emg <- -2 * sum(demg(x=D$SLV, mu = par.emg$par[1], sigma = par.emg$par[2], l
                          log = T)) + 2 * length(par.emg$par)
 
 
-round(rbind(AIC.norm, AIC.cauchy, AIC.pownorm, AIC.t, AIC.sn, AIC.gn, AIC.asgn, AIC.emg), digits=5)
+round(rbind(AIC.norm, AIC.cauchy, AIC.lst, AIC.sn, AIC.gn, AIC.asgn, AIC.emg), digits=5)
 
 # boxplot(D$SLV)
 n <- 100000
@@ -144,7 +139,7 @@ hist(rnorm(n, mean = par$par[1], sd = par$par[2]))
 hist(D$SLV)
 hist(rsn(n, xi = par.sn$par[1], omega = par.sn$par[2], alpha = par.sn$par[3]))
 hist(rgnorm(n, mu = par.gn$par[1], alpha = par.gn$par[2], beta = par.gn$par[3]))
-hist(rcauchy(n, location = par.cauchy$par[1], scale = par.cauchy$par[2]))
+hist(rlst(n, df = par.lst$par[1], mu = par.lst$par[2], sigma = par.lst$par[3]))
 hist(remg(n, mu = par.emg$par[1], sigma = par.emg$par[2], lambda = par.emg$par[3]))
 
 # ggplot(D)+
@@ -187,8 +182,8 @@ xseq <- seq(0.9*min(D$SLV), 1.1*max(D$SLV), length.out=100)
 lines(xseq, pnorm(xseq, mean = par$par[1], sd = par$par[2]), col='pink')
 plot(ecdf(D$SLV), verticals = T, main = "Generalized normal distribution")
 lines(xseq, pgnorm(xseq, mu = par.gn$par[1], alpha = par.gn$par[2], beta = par.gn$par[3]), col='green')
-plot(ecdf(D$SLV), verticals = T, main = "Skew normal distribution")
-lines(xseq, psn(xseq, xi = par.sn$par[1], omega = par.sn$par[2], alpha = par.sn$par[3]), col='red')
+plot(ecdf(D$SLV), verticals = T, main = "Location-scale t-distribution")
+lines(xseq, plst(xseq, df = par.lst$par[1], mu = par.lst$par[2], sigma = par.lst$par[3]), col='red')
 
 ########################################################################################################
 #Relevant keynumbers for the estimates:
