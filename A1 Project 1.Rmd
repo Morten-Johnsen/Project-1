@@ -258,7 +258,7 @@ Here, we can either solve our transformation expression $y=g(x)$ for $x=g^{-1}(y
 $$
 L(y) = \prod_{i=1}^n f_y(y)\dfrac{1}{g^{-1}(y)(-1+g^{-1}(y)^\lambda)}
 $$
-Calculating the negative log-likelihood we get:
+Calculating the ¿negative? log-likelihood we get:
 $$
 \mathcal{L}(y) = \sum_{i=1}^n log\left(f_y(y)\dfrac{1}{g^{-1}(y)(-1+g^{-1}(y)^\lambda)}\right)
 $$
@@ -266,7 +266,7 @@ Where $f_y(y)$ is the normal distribution pdf with mean=$\mu$ and variance=$\sig
 
 ```{r}
 dgdx <- function(x,lambda){
-  return(-1/(x*(x^lambda - 1)))
+  return(-1/(x*(x^lambda - 1))) #hvorfor -1?
 }
 
 #Density for y is simply the normal distribution:
@@ -592,8 +592,8 @@ Expected value of the distribution and its uncertainty
 ```{r}
 #### Testing reparametrization ####
 #calculate mean and variance based on current estimates
-lambda <- par.ws30$par[1]
-k <- par.ws30$par[2]
+k <- par.ws30$par[1]
+lambda <- par.ws30$par[2]
 #E[X]
 print("E[X]=")
 lambda*gamma(1+1/k)
@@ -614,7 +614,7 @@ nll.wei <- function(theta, x){
   mu <- theta[1]
   var <- theta[2]
   k <- nlminb(start = 1, objective = k.func, mu = mu, var = var)$par
-  nll <- -sum(dweibull(x, shape = mu/gamma((k+1)/k), scale = k, log = T))
+  nll <- -sum(dweibull(x, shape = k, scale = mu/gamma((k+1)/k), log = T))
   return(nll)
 }
 
@@ -624,6 +624,42 @@ par.repar.wei <- nlminb(start = c(1,0.5), objective = nll.wei, x = D$ws30, lower
 par.repar.wei$par[1]
 #Var[X]
 par.repar.wei$par[2]
+
+################################################################################################### E[x]: CIs (lb and W), and PL
+nll.repar.ws30 <- function(p, data){
+  k <- p[1]
+  theta <- p[2]
+  return( -sum(dweibull(x = data, shape = k, scale = theta / gamma(1 + 1/k), log = T)) )
+}
+repar.E.ws30 <- nlminb(start = c(1,1), objective = nll.repar.ws30, data = D$ws30) #E[x] = par.E.ws30[2] 
+
+repar.ws30.fun <- function(shape, theta, data){#####
+  prod(dweibull(x = data, shape = shape, scale = theta / gamma(1 + 1/shape), log = F)*2)#to not get full zeros
+}
+
+repar.l.ws30.fun <- function(shape, theta, data){#####
+  sum(dweibull(x = data, shape = shape, scale = theta / gamma(1 + 1/shape), log = T))
+}
+
+CIfun.repar.ws30 <- function(y, data, mles){##### T for shape, F for scale
+  k <- mles[1]
+  theta <- mles[2]
+  sum(dweibull(x = data, shape = k, scale = theta / gamma(1 + 1/k), log = T)) -
+    sum(dweibull(x = data, shape = k, scale = y / gamma(1 + 1/k), log = T)) - 
+    0.5 * qchisq(1-alpha, df = 1) 
+}
+
+Es <- seq(8, 10.4, by = 0.001)
+ws30.E <- sapply(X = Es, FUN = repar.ws30.fun, shape = repar.E.ws30$par[1], data = D$ws30)
+plot(Es, ws30.E/max(ws30.E), col = 1, type = "l", xlab = expression(paste("Expected value E[x] or ", theta)),
+     main = "Expected value for weibull model of wind speed")
+CI.ws30.E <- c(uniroot(f = CIfun.repar.ws30, interval = c(min(Es), repar.E.ws30$par[2]), data = D$ws30, mles = repar.E.ws30$par)$root,
+               uniroot(f = CIfun.repar.ws30, interval = c(repar.E.ws30$par[2], max(Es)), data = D$ws30, mles = repar.E.ws30$par)$root)
+lines(range(Es), c*c(1,1), col = 2)
+
+H.ws30.E <- hessian(repar.l.ws30.fun, repar.E.ws30$par[2], shape = repar.E.ws30$par[1], data = D$ws30)
+V.ws30.E <- as.numeric(-1/H.ws30.E)
+wald.ws30.E <- repar.E.ws30$par[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30.E)
 ```
 
 ##### Wind direction 
@@ -683,12 +719,12 @@ wald.wd30.rho <- mle.wd30[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.wd30.rho)
 
 ```
 
-The most appropriate distributions and their parameter estimates and associated uncertainties
+The most appropriate distributions and their parameter estimates (plots) and associated uncertainties (values)
 ```{r}
 par(mfrow=c(1,3))
 
-temp1 <- paste("alpha == ", mle.pow[1]) #par.beta$par[1]
-temp2 <- paste("beta == ", mle.pow[2]) #par.beta$par[2]
+temp1 <- paste("alpha == ", round(mle.pow[1], 4)) #par.beta$par[1]
+temp2 <- paste("beta == ", round(mle.pow[2], 3)) #par.beta$par[2]
 temp <- c(temp1, temp2)
 
 pp <- ggplot(D)+
@@ -702,8 +738,8 @@ pp <- ggplot(D)+
         ,legend.background = element_rect(fill = "white", color = "black"))+
   labs(colour = "")
 
-temp1 <- paste("k == ", mle.ws30.weib[1]) #par.ws30$par[1]
-temp2 <- paste("lambda == ", mle.ws30.weib[2]) #par.ws30$par[2]
+temp1 <- paste("k == ", round(mle.ws30.weib[1],3)) #par.ws30$par[1]
+temp2 <- paste("lambda == ", round(mle.ws30.weib[2],3)) #par.ws30$par[2]
 temp <- c(temp1, temp2)
 
 ps <- ggplot(D)+
@@ -716,8 +752,8 @@ ps <- ggplot(D)+
         ,legend.background = element_rect(fill = "white", color = "black"))+
   labs(colour = "")
 
-temp1 <- paste("mu ==", mle.wd30[1]) #wrapped.cauc.par$par[1]
-temp2 <- paste("rho ==", mle.wd30[2]) #wrapped.cauc.par$par[2]
+temp1 <- paste("mu ==", round(mle.wd30[1], 3)) #wrapped.cauc.par$par[1]
+temp2 <- paste("rho ==", round(mle.wd30[2],4)) #wrapped.cauc.par$par[2]
 temp <- c(temp1, temp2)
 
 pd <- ggplot(D)+
@@ -735,11 +771,15 @@ pd <- ggplot(D)+
 grid.arrange(pp,ps,pd,nrow = 1)
 ```
 
+First are given the 95% likelihood based and Wald CIs of the parameters of the different models for the power, wind speed, and wind direction observations respetively. The maximum likelihood estimates are also given. Below can be seen the expected value along with the uncertainty thereof for the weibull model of the wind speed distribution. The expected value for the model of the power is not given as the data has been transformed. Further, the expected value for the wrapped cauchy model is not explicitly stated below as it is simply the location parameter $\mu$. These values can be found alongside the other parameters values below.
+
 ```{r}
 #All CIs of parameters
 round( rbind( CI.pow1, wald.pow.shape1, CI.pow2, wald.pow.shape2, mle.pow,
               CI.ws30.shape, wald.ws30.shape, CI.ws30.scale, wald.ws30.scale, mle.ws30.weib, 
               CI.wd30.mu, wald.wd30.mu, CI.wd30.rho, wald.wd30.rho, mle.wd30 ), digits = 3 )
+
+round( rbind(CI.ws30.E, wald.ws30.E), digits=3);round( rbind(repar.E.ws30$par[2]), digits=3)
 ```
 
 ##### Expected values and uncertainty
