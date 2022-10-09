@@ -147,13 +147,14 @@ theta.hat <- nlminb(start = 1, objective = L)$par
 
 var <- solve(hessian(func <- L, x = theta.hat))
 sd <- as.numeric(sqrt(var))
-CI <- p.hat + c(-1,1)*qnorm(c(0.975))*sd/sqrt(sum(log.data$n))
+CI <- p.hat + c(-1,1)*qnorm(c(0.975))*sd/sqrt(sum(log.data$n)) #Så skal det her vel ikke bruges?
 
 #jeg tænkte på, om ikke det var dette CI som kunne bruges til at teste vha. likelihood, om theta.hat overlapper med 0:
 H.L.theta <- hessian(func = L, x = theta.hat)
 V.L.theta <- solve(H.L.theta)
 CI.theta <- theta.hat + c(-1,1) * qnorm(0.975) * sqrt(V.L.theta)
 #KOMMENTAR:SLUT. Dette CI.theta kan vel bruges til at sige noget om, at da det ikke indeholder 0, så må effekten være signifikant?
+#Det virker rigtigt. Hvilket slide/hvilken side i bogen er brugt?
 ```
 
 Result: By means of the usual non-likelihood method of proportion testing it has been shown that there is a statistically significant effect of the treatment.
@@ -244,7 +245,7 @@ print(cat(paste0("with glm model: ", coef(fit.glm)
 
 ##### Calculating confidence intervals for the two beta parameters
 
-Below can be seen the profile likelihood curves for the $p_0$ and $p_1$ estimates.
+Below can be seen the profile likelihood curves for the $\beta_0$ and $\beta_1$ estimates.
 
 ```{r}
 #Profile likelihoods
@@ -287,8 +288,9 @@ sd_1 <- as.numeric(sqrt(solve(hessian(beta_1, func = nll.p_1, beta_0 = beta_0)))
 
 #Wald 95% CIs and profile-likelihoods with approx 95% CI
 W.CI.0 <- round(beta_0 + c(-1,1)*qnorm(0.975)*sd_0,4)
-W.CI.1 <- round(beta_1 + c(-1,1)*qnorm(0.975)*sd_1,4)#KOMMENTAR: CI.theta fra den tidligere kommentar er lig dette interval. Dette er vel netop, fordi theta i den sammenhæng beskriver forskellen på, om der er treatment eller ej, hvilket er det præcis samme som beta_1.
+W.CI.1 <- round(beta_1 + c(-1,1)*qnorm(0.975)*sd_1,4) #KOMMENTAR: CI.theta fra den tidligere kommentar er lig dette interval. Dette er vel netop, fordi theta i den sammenhæng beskriver forskellen på, om der er treatment eller ej, hvilket er det præcis samme som beta_1.
 #W.CI.1;CI.theta
+#Måske, forstår stadig ikke helt theta.hat fra tidligere, så det er svært at sige. Men du har nok ret.
 
 #Direkte numerisk approksimation:
 CI.0 <- round(c(min(beta.zero.sims[-(pL.b0+max(-pL.b0)) > -qchisq(0.95, df = 1)/2])
@@ -298,10 +300,10 @@ CI.1 <- round(c(min(beta.one.sims[-(pL.b1+max(-pL.b1)) > -qchisq(0.95, df = 1)/2
 
 cat(paste("Wald Confidence intervals:"
       ,paste("\nbeta_0 = ", round(beta_0, 4), " [95% CI: ", W.CI.0[1],", ", W.CI.0[2],"]")
-      ,paste("\nbeta_0 = ", round(beta_1, 4), " [95% CI: ", W.CI.1[1],", ", W.CI.1[2],"]")
+      ,paste("\nbeta_1 = ", round(beta_1, 4), " [95% CI: ", W.CI.1[1],", ", W.CI.1[2],"]")
       ,"\n\nLikelihood-based Confidence intervals:"
       ,paste0("\nbeta_0 = ", round(beta_0, 4), " [95% CI: ", CI.0[1],", ", CI.0[2],"]")
-      ,paste0("\nbeta_0 = ", round(beta_1, 4), " [95% CI: ", CI.1[1],", ", CI.1[2],"]")))
+      ,paste0("\nbeta_1 = ", round(beta_1, 4), " [95% CI: ", CI.1[1],", ", CI.1[2],"]")))
 ```
 
 Comparing these to eachother, we see that the Wald CI is a very good approximation of the actual CIs. However, when comparing the estimates to our glm model we see that the $95\%$ CI for AZT is wider for the model estimate...
@@ -650,6 +652,8 @@ H_nuis <- hessian(l.exp, beta_hat$par[1], beta_tr = beta_hat$par[2])
 V_nuis <- as.numeric(-1/H_nuis)
 ( Wald.CI_nuis <- round(beta_hat$par[1] + c(-1,1)*qnorm(0.975) * sqrt(V_nuis), digits=2) )
 Wald.CI <- matrix(c(Wald.CI_nuis, Wald.CI_tr), 2,2, byrow = T)#KOMMENTAR: Jeg har regnet wald på en anden måde og får nu det samme som for likelihood based CI. Det lader til, at '-1/H' og 'diag(solve())' er forskellen på de to. Den første giver det samme som likelihood based, den anden giver det samme som confint. 20 linjer nede er de alle sammen sammenlignet.
+#SVAR: Den gamle metode bør være korrekt. Forskellen kommer fra om man regner H^-1 som en matrix eller et tal.
+#er rimelig sikker på at den bør behandles som matrix, da det anvender mest data.
 
 sd.former <- as.numeric(sqrt(diag(solve(hessian(beta_hat$par, func = nll.exp)))))
 Wald.CI_former <- beta_hat$par + matrix(c(-1,1), 2,2, byrow = T) * matrix(qnorm(0.975)*sd.former, 2,2, byrow = F)

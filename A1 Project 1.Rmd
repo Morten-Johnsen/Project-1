@@ -267,12 +267,15 @@ Where $f_y(y)$ is the normal distribution pdf with mean=$\mu$ and variance=$\sig
 ```{r}
 dgdx <- function(x,lambda){
   return(-1/(x*(x^lambda - 1))) #KOMMENTAR: hvorfor -1?
+  #har tilføjet abs(dg/dx) til funktionen nedenfor. Det virker ikke til at gøre nogen forskel. Formodentligt 
+  #fordi at x^lambda < 1 for alle værdier af D$pow.obs.norm, hvormed at udtrykket alligevel blev positivt.
+  #men nu er koden i hvert fald rettet til at inkludere abs og er dermed mere korrekt.
 }
 
 #Density for y is simply the normal distribution:
 nll.y <- function(theta, x){
   y <- Trans.eq1(lambda, x)
-  return(-sum(log(dnorm(y, mean = theta[1], sd = theta[2])*dgdx(x, lambda))))
+  return(-sum(log(dnorm(y, mean = theta[1], sd = theta[2])*abs(dgdx(x, lambda)))))
 }
 theta.hat.y <- nlminb(start = c(0,1), objective = nll.y
        , x = D$pow.obs.norm)
