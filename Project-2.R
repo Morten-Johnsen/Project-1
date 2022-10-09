@@ -1,6 +1,7 @@
 rm(list = ls())
 library(tidyverse)
 library(gridExtra)
+library(numDeriv)
 
 if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
   setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
@@ -39,6 +40,7 @@ no.AZT.par <- nlminb(start = 0.1, objective = testDistribution
                      , x = c(x.no.AZT[1], x.no.AZT[2])
                      , distribution = "binomial")
 
+bin.par$par;AZT.par$par;no.AZT.par$par
 #Compare proportions:
 #There's generally two approaches to doing this: 1) The large sample hypothesis test
 #2) Likelihood analysis
@@ -88,7 +90,7 @@ print(paste0("Mean p for group with no AZT treatment: ", round(no.AZT.par$par,3)
 ## Likelihood analysis (Den her del er formodentligt ikke færdig)
 x1 <- log.data$AIDS_yes[1]
 x2 <- log.data$AIDS_yes[2]
-n1 <- log.data$n[2]
+n1 <- log.data$n[1] #har rettet fra [2]
 n2 <- log.data$n[2]
 
 (theta.hat <- log(x1/(n1-x1)*(n2-x2)/x2))
@@ -105,11 +107,16 @@ L <- function(theta){
   return(-log(exp(theta*x1+eta.hat*(x1+x2))/((1+exp(theta+eta.hat))^n1*(1+exp(eta.hat))^n2)))
 }
 
-library(numDeriv)
+theta.hat <- nlminb(start = 1, objective = L)$par
+
 var <- solve(hessian(func <- L, x = theta.hat))
 sd <- as.numeric(sqrt(var))
-
 CI <- p.hat + c(-1,1)*qnorm(c(0.975))*sd/sqrt(sum(log.data$n))
+
+#jeg tænkte på, om ikke det var dette CI som kunne bruges til at teste vha. likelihood, om theta.hat overlapper med 0:
+H.L.theta <- hessian(func = L, x = theta.hat)
+V.L.theta <- solve(H.L.theta)
+CI.theta <- theta.hat + c(-1,1) * qnorm(0.975) * sqrt(V.L.theta)
 
 
 #### Bullet point 4
