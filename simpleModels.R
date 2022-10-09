@@ -7,7 +7,7 @@ library(pheatmap)
 library(numDeriv)
 
 #Retrieve data from the descriptive statistics script
-##### TILPAS DEN HER TIL DEN COMPUTER DEER BRUGES
+##### TILPAS DEN HER TIL DEN COMPUTER DER BRUGES
 if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
   setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
 } else {
@@ -286,6 +286,80 @@ V.ws30.scale <- as.numeric(-1/H.ws30.scale)
 wald.ws30.shape <- mle.ws30.weib[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30.shape)
 wald.ws30.scale <- mle.ws30.weib[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30.scale)
 
+####### E[x] ####### START 1
+k <- par.ws30$par[1]
+lambda <- par.ws30$par[2]
+
+#E[X]
+print("E[X]=")
+lambda*gamma(1+1/k)
+#Var[X]
+print("Var[X]=")
+lambda^2 * (gamma(1+2/k) - (gamma(1+1/k))^2)
+
+#function for numerical estimate of the shape parameter based on mean and variance.
+k.func <- function(k,mu,var){
+  var.est <- mu^2 * (gamma(1+2/k) - gamma(1+1/k)^2)/gamma((k+1)/k)^2
+  return((var - var.est)^2)
+}
+
+nll.wei <- function(theta, x){
+  mu <- theta[1]
+  var <- theta[2]
+  k <- nlminb(start = 1, objective = k.func, mu = mu, var = var)$par
+  nll <- -sum(dweibull(x, shape = k, scale = mu/gamma((k+1)/k), log = T))
+  return(nll)
+}
+
+par.repar.wei <- nlminb(start = c(1,0.5), objective = nll.wei, x = D$ws30, lower = c(0,0))
+
+#E[X]
+par.repar.wei$par[1]
+#Var[X]
+par.repar.wei$par[2]
+
+####### E[x] ####### END 1
+####### E[x] ####### START 2
+#We know that the expected value is given by: weibull_E[x] = lambda * gamma(1 + 1/k). So: lambda ) E[x]/gamma(1+1/k)
+nll.repar.ws30 <- function(p, data){
+  k <- p[1]
+  theta <- p[2]
+  return( -sum(dweibull(x = data, shape = k, scale = theta / gamma(1 + 1/k), log = T)) )
+}
+repar.E.ws30 <- nlminb(start = c(1,1), objective = nll.repar.ws30, data = D$ws30) #E[x] = par.E.ws30[2] 
+
+### equiv ^ to the code above ###
+
+repar.ws30.fun <- function(shape, theta, data){#####
+  prod(dweibull(x = data, shape = shape, scale = theta / gamma(1 + 1/shape), log = F)*2)#to not get full zeros
+}
+
+repar.l.ws30.fun <- function(shape, theta, data){#####
+  sum(dweibull(x = data, shape = shape, scale = theta / gamma(1 + 1/shape), log = T))
+}
+
+CIfun.repar.ws30 <- function(y, data, mles){##### T for shape, F for scale
+  k <- mles[1]
+  theta <- mles[2]
+  sum(dweibull(x = data, shape = k, scale = theta / gamma(1 + 1/k), log = T)) -
+    sum(dweibull(x = data, shape = k, scale = y / gamma(1 + 1/k), log = T)) - 
+    0.5 * qchisq(1-alpha, df = 1) 
+}
+
+Es <- seq(8, 10.4, by = 0.001)
+ws30.E <- sapply(X = Es, FUN = repar.ws30.fun, shape = repar.E.ws30$par[1], data = D$ws30)
+plot(Es, ws30.E/max(ws30.E), col = 1, type = "l", xlab = expression(paste("Expected value E[x] or ", theta)),
+     main = "Expected value for weibull model of wind speed")
+CI.ws30.E <- c(uniroot(f = CIfun.repar.ws30, interval = c(min(Es), repar.E.ws30$par[2]), data = D$ws30, mles = repar.E.ws30$par)$root,
+               uniroot(f = CIfun.repar.ws30, interval = c(repar.E.ws30$par[2], max(Es)), data = D$ws30, mles = repar.E.ws30$par)$root)
+lines(range(Es), c*c(1,1), col = 2)
+
+H.ws30.E <- hessian(repar.l.ws30.fun, repar.E.ws30$par[2], shape = repar.E.ws30$par[1], data = D$ws30)
+V.ws30.E <- as.numeric(-1/H.ws30.E)
+wald.ws30.E <- repar.E.ws30$par[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30.E)
+
+round( rbind(CI.ws30.E, wald.ws30.E), digits=3);round( rbind(repar.E.ws30$par[2]), digits=3)
+####### E[x] ####### END 2
 
 ## CI ## WIND DIRECTION
 par(mfrow=c(1,2))
@@ -392,3 +466,4 @@ ggplot(D)+
   stat_function(fun = dwrappedcauchy, n = dim(D)[1], args = list(mu = wrapped.cauc.par$par[1], rho = 0.36))+
   annotate( "text", x = 1/5*max(D$wd30), y = c(0.35, 0.325), label = c(temp1,temp2), parse = T  ) +
   ggtitle("Wrapped cauchy distribution and distribution of the wind direction")
+
