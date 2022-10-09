@@ -122,11 +122,43 @@ cat(paste("chi_squared test statistic: ", chi_squared_yates, "\nP-value: ", pchi
 #prop.test(log.data$AIDS_yes, log.data$n)
 #or
 #chisq.test(as.matrix(log.data.for.chi[,c(2,4)]))
+
+#Likelihood-metode: #KOMMENTAR:START se ca. 30 linjer nede for "KOMMENTAR:SLUT"
+x1 <- log.data$AIDS_yes[1]
+x2 <- log.data$AIDS_yes[2]
+n1 <- log.data$n[1] #har rettet fra [2]
+n2 <- log.data$n[2]
+
+(theta.hat <- log(x1/(n1-x1)*(n2-x2)/x2))
+
+eta.start <- log(x2/(n2-x2))
+
+L_theta <- function(eta){ 
+  return(-log(exp(theta.hat*x1+eta*(x1+x2))/((1+exp(theta.hat+eta))^n1*(1+exp(eta))^n2)))
+}
+(eta.hat <- nlminb(eta.start, objective = L_theta)$par)
+
+#Now we can construct CIs based on the Likelihood function
+L <- function(theta){
+  return(-log(exp(theta*x1+eta.hat*(x1+x2))/((1+exp(theta+eta.hat))^n1*(1+exp(eta.hat))^n2)))
+}
+
+theta.hat <- nlminb(start = 1, objective = L)$par
+
+var <- solve(hessian(func <- L, x = theta.hat))
+sd <- as.numeric(sqrt(var))
+CI <- p.hat + c(-1,1)*qnorm(c(0.975))*sd/sqrt(sum(log.data$n))
+
+#jeg tænkte på, om ikke det var dette CI som kunne bruges til at teste vha. likelihood, om theta.hat overlapper med 0:
+H.L.theta <- hessian(func = L, x = theta.hat)
+V.L.theta <- solve(H.L.theta)
+CI.theta <- theta.hat + c(-1,1) * qnorm(0.975) * sqrt(V.L.theta)
+#KOMMENTAR:SLUT. Dette CI.theta kan vel bruges til at sige noget om, at da det ikke indeholder 0, så må effekten være signifikant?
 ```
 
-Result: There is a statistically significant effect of the treatment.
+Result: By means of the usual non-likelihood method of proportion testing it has been shown that there is a statistically significant effect of the treatment.
 
-Calculating MLE and uncertainty for $p_0$ and $p_1$:
+Calculating MLE and uncertainty for $p_0$ and $p_1$. 
 
 ```{r}
 #Using the Wald statistic:
@@ -255,7 +287,8 @@ sd_1 <- as.numeric(sqrt(solve(hessian(beta_1, func = nll.p_1, beta_0 = beta_0)))
 
 #Wald 95% CIs and profile-likelihoods with approx 95% CI
 W.CI.0 <- round(beta_0 + c(-1,1)*qnorm(0.975)*sd_0,4)
-W.CI.1 <- round(beta_1 + c(-1,1)*qnorm(0.975)*sd_1,4)
+W.CI.1 <- round(beta_1 + c(-1,1)*qnorm(0.975)*sd_1,4)#KOMMENTAR: CI.theta fra den tidligere kommentar er lig dette interval. Dette er vel netop, fordi theta i den sammenhæng beskriver forskellen på, om der er treatment eller ej, hvilket er det præcis samme som beta_1.
+#W.CI.1;CI.theta
 
 #Direkte numerisk approksimation:
 CI.0 <- round(c(min(beta.zero.sims[-(pL.b0+max(-pL.b0)) > -qchisq(0.95, df = 1)/2])
@@ -344,7 +377,7 @@ theta.hat.both <- sum(actg$time)/sum(actg$event)
 
 Theta for each group individually:
 ```{r}
-#With treatment:
+#With treatment: (p. 311)
 actg_tx <- filter(actg, tx == 1)
 theta.hat.tx <- sum(actg_tx$time)/sum(actg_tx$event)
 sigma.hat.tx <- theta.hat.tx/sum(actg$event)^(1/2)
@@ -357,6 +390,41 @@ sigma.hat.no.tx <- theta.hat.tx/sum(actg$event)^(1/2)
 #Wald statistic for comparison
 (theta.hat.tx - theta.hat.no.tx)/sqrt(sigma.hat.tx^2 + sigma.hat.no.tx^2)
 #this is larger than 2 and thus statistically significant.
+
+#######exp plots#######
+p.both.th <- ggplot(actg)+
+  geom_histogram(aes(x = time, y = ..density.., fill = "Data"), alpha = 0.5)+
+  stat_function(aes(colour = "Exp. Model"), fun = dexp, n = dim(actg)[1], args = list(rate = 1/theta.hat.both))+
+  ggtitle("Ignoring Treatment Effect")+
+  theme(legend.position = "top")+
+  lims(x = c(0,max(actg$time)+10), y = c(0,0.012))+
+  labs(fill = "", colour = "", x = "Time to Event")+
+  scale_colour_manual(values = "purple")+
+  scale_fill_manual(values = "purple")
+
+p.t1.th <- ggplot(actg_tx)+
+  geom_histogram(aes(x = time, y = ..density.., fill = "Data"), alpha = 0.5)+
+  stat_function(aes(colour = "Exp. Model"), fun = dexp, n = dim(actg_tx)[1], args = list(rate = 1/theta.hat.tx))+
+  ggtitle("Treatment")+
+  theme(legend.position = "top")+
+  lims(x = c(0,max(actg_tx$time)+10), y = c(0,0.012))+
+  labs(fill = "", colour = "", x = "Time to Event")+
+  scale_colour_manual(values = "blue")+
+  scale_fill_manual(values = "blue")
+
+p.t2.th <- ggplot(actg_no_tx)+
+  geom_histogram(aes(x = time, y = ..density.., fill = "Data"), alpha = 0.5)+
+  stat_function(aes(colour = "Exp. Model"), fun = dexp, n = dim(actg_no_tx)[1], args = list(rate = 1/theta.hat.no.tx))+
+  ggtitle("No Treatment")+
+  theme(legend.position = "top")+
+  lims(x = c(0,max(actg_no_tx$time)+10), y = c(0,0.012))+
+  scale_colour_manual(values = "red")+
+  labs(fill = "", colour = "", x = "Time to Event")+
+  scale_fill_manual(values = "red")
+
+grid.arrange(p.both.th, p.t1.th,p.t2.th, nrow = 1)
+
+
 ```
 
 Fitting an exponential model to time for both and for each treatment where we ignore censoring
@@ -415,7 +483,7 @@ p.t2 <- ggplot(actg_event[actg_event$tx == 0,])+
   labs(fill = "", colour = "", x = "Time to Event")+
   scale_fill_manual(values = "red")
 
-grid.arrange(p.both, p.t1, p.t2, nrow = 1)
+grid.arrange(p.both, p.t1,p.t2, nrow = 1)
 ```
 
 #### Compared the likelihood for the above models and conclude
@@ -506,6 +574,12 @@ nll.exp <- function(beta, time = actg$time, event = actg$event, treatment = actg
   nll <- -sum(event*log(h) - H)
   return(nll)
 }
+l.exp <- function(beta_tr, beta_nuis, time = actg$time, event = actg$event, treatment = actg$tx){
+  h <- exp(- beta_nuis - beta_tr * treatment)
+  H <- time/exp(beta_nuis + beta_tr*treatment)
+  ll <- sum(event*log(h) - H)
+  return(ll)
+}
 
 beta_hat <- nlminb(start = c(1,1)
                    , objective = nll.exp
@@ -569,11 +643,16 @@ abline(h = -qchisq(0.95, df = 1)/2, col = 2)
 
 ```{r}
 #CI:
-sd <- as.numeric(sqrt(diag(solve(hessian(beta_hat$par, func = nll.exp)))))
+H_tr <- hessian(l.exp, beta_hat$par[2], beta_nuis = beta_hat$par[1])
+V_tr <- as.numeric(-1/H_tr)
+( Wald.CI_tr <- round(beta_hat$par[2] + c(-1,1)*qnorm(0.975) * sqrt(V_tr), digits=2) )
+H_nuis <- hessian(l.exp, beta_hat$par[1], beta_tr = beta_hat$par[2])
+V_nuis <- as.numeric(-1/H_nuis)
+( Wald.CI_nuis <- round(beta_hat$par[1] + c(-1,1)*qnorm(0.975) * sqrt(V_nuis), digits=2) )
+Wald.CI <- matrix(c(Wald.CI_nuis, Wald.CI_tr), 2,2, byrow = T)#KOMMENTAR: Jeg har regnet wald på en anden måde og får nu det samme som for likelihood based CI. Det lader til, at '-1/H' og 'diag(solve())' er forskellen på de to. Den første giver det samme som likelihood based, den anden giver det samme som confint. 20 linjer nede er de alle sammen sammenlignet.
 
-#Wald 95 procent CIs and profile-likelihoods with approx 95 procent CI
-#Måske er der et eller andet i vejen med de her WALD CIs
-Wald.CI <- round(beta_hat$par + matrix(c(-1,1), 2,2, byrow = T) * matrix(qnorm(0.975)*sd, 2,2, byrow = F),4)
+sd.former <- as.numeric(sqrt(diag(solve(hessian(beta_hat$par, func = nll.exp)))))
+Wald.CI_former <- beta_hat$par + matrix(c(-1,1), 2,2, byrow = T) * matrix(qnorm(0.975)*sd.former, 2,2, byrow = F)
 
 #Direkte numerisk approksimation:
 CI.0 <- c(min(beta.zero.sims[-(pL.beta0+max(-pL.beta0)) > -qchisq(0.95, df = 1)/2])
@@ -591,7 +670,7 @@ cat(paste("Wald Confidence intervals:"
 
 Comparing with the results from the survfit function:
 ```{r}
-confint(fit)
+confint(fit);round(Wald.CI_former, digits=2)#KOMMENTAR: se her sammenligningen omtalt i den tidligere kommentar
 ```
 
 Same as the wald CI. The likelihood based CI is a bit more narrow.
@@ -599,6 +678,7 @@ Same as the wald CI. The likelihood based CI is a bit more narrow.
 #### Derive the theoretical results for the models above, including the standard error estimates, use this to formulate and implement the profile likelihood function for the treatment parameter.
 
 ```{r}
+( sd_tr <- sqrt(V_tr) )
 par(mfrow = c(1,2))
 plot(beta.zero.sims
      , -(pL.beta0+max(-pL.beta0))

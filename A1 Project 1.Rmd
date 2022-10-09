@@ -258,15 +258,15 @@ Here, we can either solve our transformation expression $y=g(x)$ for $x=g^{-1}(y
 $$
 L(y) = \prod_{i=1}^n f_y(y)\dfrac{1}{g^{-1}(y)(-1+g^{-1}(y)^\lambda)}
 $$
-Calculating the ¿negative? log-likelihood we get:
+Calculating the negative log-likelihood we get:
 $$
-\mathcal{L}(y) = \sum_{i=1}^n log\left(f_y(y)\dfrac{1}{g^{-1}(y)(-1+g^{-1}(y)^\lambda)}\right)
+\mathcal{L}(y) = -\sum_{i=1}^n log\left(f_y(y)\dfrac{1}{g^{-1}(y)(-1+g^{-1}(y)^\lambda)}\right)
 $$
 Where $f_y(y)$ is the normal distribution pdf with mean=$\mu$ and variance=$\sigma^2$). We define this log-likelihood in R and get:
 
 ```{r}
 dgdx <- function(x,lambda){
-  return(-1/(x*(x^lambda - 1))) #hvorfor -1?
+  return(-1/(x*(x^lambda - 1))) #KOMMENTAR: hvorfor -1?
 }
 
 #Density for y is simply the normal distribution:
