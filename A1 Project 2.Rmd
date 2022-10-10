@@ -154,7 +154,7 @@ H.L.theta <- hessian(func = L, x = theta.hat)
 V.L.theta <- solve(H.L.theta)
 CI.theta <- theta.hat + c(-1,1) * qnorm(0.975) * sqrt(V.L.theta)
 #KOMMENTAR:SLUT. Dette CI.theta kan vel bruges til at sige noget om, at da det ikke indeholder 0, så må effekten være signifikant?
-#Det virker rigtigt. Hvilket slide/hvilken side i bogen er brugt?
+#Det virker rigtigt. Hvilket slide/hvilken side i bogen er brugt? Slide 22, uge 4. Her er pi_1 = x1/n1 og pi_2 = x2/n2.
 ```
 
 Result: By means of the usual non-likelihood method of proportion testing it has been shown that there is a statistically significant effect of the treatment.
@@ -654,8 +654,10 @@ V_nuis <- as.numeric(-1/H_nuis)
 Wald.CI <- matrix(c(Wald.CI_nuis, Wald.CI_tr), 2,2, byrow = T)#KOMMENTAR: Jeg har regnet wald på en anden måde og får nu det samme som for likelihood based CI. Det lader til, at '-1/H' og 'diag(solve())' er forskellen på de to. Den første giver det samme som likelihood based, den anden giver det samme som confint. 20 linjer nede er de alle sammen sammenlignet.
 #SVAR: Den gamle metode bør være korrekt. Forskellen kommer fra om man regner H^-1 som en matrix eller et tal.
 #er rimelig sikker på at den bør behandles som matrix, da det anvender mest data.
-
+sd <- c(sqrt(V_nuis), sqrt(V_tr))
 sd.former <- as.numeric(sqrt(diag(solve(hessian(beta_hat$par, func = nll.exp)))))
+sd;sd.former
+
 Wald.CI_former <- beta_hat$par + matrix(c(-1,1), 2,2, byrow = T) * matrix(qnorm(0.975)*sd.former, 2,2, byrow = F)
 
 #Direkte numerisk approksimation:
