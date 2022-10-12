@@ -391,101 +391,65 @@ sigma.hat.no.tx <- theta.hat.tx/sum(actg$event)^(1/2)
 
 #Wald statistic for comparison
 (theta.hat.tx - theta.hat.no.tx)/sqrt(sigma.hat.tx^2 + sigma.hat.no.tx^2)
-#this is larger than 2 and thus statistically significant.
-
-#######exp plots#######
-p.both.th <- ggplot(actg)+
-  geom_histogram(aes(x = time, y = ..density.., fill = "Data"), alpha = 0.5)+
-  stat_function(aes(colour = "Exp. Model"), fun = dexp, n = dim(actg)[1], args = list(rate = 1/theta.hat.both))+
-  ggtitle("Ignoring Treatment Effect")+
-  theme(legend.position = "top")+
-  lims(x = c(0,max(actg$time)+10), y = c(0,0.012))+
-  labs(fill = "", colour = "", x = "Time to Event")+
-  scale_colour_manual(values = "purple")+
-  scale_fill_manual(values = "purple")
-
-p.t1.th <- ggplot(actg_tx)+
-  geom_histogram(aes(x = time, y = ..density.., fill = "Data"), alpha = 0.5)+
-  stat_function(aes(colour = "Exp. Model"), fun = dexp, n = dim(actg_tx)[1], args = list(rate = 1/theta.hat.tx))+
-  ggtitle("Treatment")+
-  theme(legend.position = "top")+
-  lims(x = c(0,max(actg_tx$time)+10), y = c(0,0.012))+
-  labs(fill = "", colour = "", x = "Time to Event")+
-  scale_colour_manual(values = "blue")+
-  scale_fill_manual(values = "blue")
-
-p.t2.th <- ggplot(actg_no_tx)+
-  geom_histogram(aes(x = time, y = ..density.., fill = "Data"), alpha = 0.5)+
-  stat_function(aes(colour = "Exp. Model"), fun = dexp, n = dim(actg_no_tx)[1], args = list(rate = 1/theta.hat.no.tx))+
-  ggtitle("No Treatment")+
-  theme(legend.position = "top")+
-  lims(x = c(0,max(actg_no_tx$time)+10), y = c(0,0.012))+
-  scale_colour_manual(values = "red")+
-  labs(fill = "", colour = "", x = "Time to Event")+
-  scale_fill_manual(values = "red")
-
-grid.arrange(p.both.th, p.t1.th,p.t2.th, nrow = 1)
-
-
+#this is larger than 2 and thus statistically significant (skal der sammenlignes med t-dist eller chi_squared?)
 ```
 
-Fitting an exponential model to time for both and for each treatment where we ignore censoring
 
 ```{r}
-#only use times for event = 1, to filter out all the time of event indices with are longer than the reported time
-#given the fact that the participants in the event = 0 group, has not 'experienced' the event yet.
-#Ved sgu ikke om ovenstående er en passende antagelse....
+exp.nll <- function(theta, time = actg$time, event = actg$event){
+  nll <- -(sum(event)*log(1/theta) - sum(time/theta))
+  return(nll)
+}
 
-actg_event <- actg %>%
-  filter(event == 1)
+est <- nlminb(start = 1, objective = exp.nll)
 
-both <- nlminb(start = 2
-               , objective = testDistribution
-               , x = actg_event$time
-               , distribution = "exponential")
+#weibull
+wei.nll <- function(omega, time = actg$time, event = actg$event){
+  sigma <- omega[2]
+  theta <- omega[1]
+  
+  p <- sigma^(-1)*time^(1/sigma-1)*theta^(-1/sigma) * exp(-time/theta)^(1/sigma)
+  P <- exp(-(time/theta)^(1/sigma))
+  nll <- -sum(log(p^event*P^(1-event)))
+}
 
-#separate exponential models
-t1 <- nlminb(start = 2
-             , objective = testDistribution
-             , x = filter(actg_event, tx == 1)$time
-             , distribution = "exponential")
+est.wei <- nlminb(start = c(2,2), objective = wei.nll, time = actg_tx$time, event = actg_tx$event)
 
-t0 <- nlminb(start = 2
-             , objective = testDistribution
-             , x = filter(actg_event, tx == 0)$time
-             , distribution = "exponential")
-#Potato plots:
-p.both <- ggplot(actg_event)+
-  geom_histogram(aes(x = time, y = ..density.., fill = "Data"), alpha = 0.5)+
-  stat_function(aes(colour = "Exp. Model"), fun = dexp, n = dim(actg_event)[1], args = list(rate = both$par))+
-  ggtitle("Ignoring Treatment Effect")+
-  theme(legend.position = "top")+
-  lims(x = c(0,max(actg_event$time)+10), y = c(0,0.012))+
-  labs(fill = "", colour = "", x = "Time to Event")+
-  scale_colour_manual(values = "purple")+
-  scale_fill_manual(values = "purple")
+#cumulative hazard function:
+kaplan.meier <- survfit(Surv(time, event) ~ 1, data = actg)
+kaplan.meier$time
+kaplan.meier$cumhaz
+est.cumhaz <- pexp(kaplan.meier$time, rate = 1/est$par)
+compare.table <- tibble("time" = kaplan.meier$time, "KM cumhaz" = kaplan.meier$cumhaz, "exp cumhaz" = est.cumhaz)
 
-p.t1 <- ggplot(actg_event[actg_event$tx == 1,])+
-  geom_histogram(aes(x = time, y = ..density.., fill = "Data"), alpha = 0.5)+
-  stat_function(aes(colour = "Exp. Model"), fun = dexp, n = dim(actg_event)[1], args = list(rate = t1$par))+
-  ggtitle("Treatment")+
-  theme(legend.position = "top")+
-  lims(x = c(0,max(actg_event$time)+10), y = c(0,0.012))+
-  labs(fill = "", colour = "", x = "Time to Event")+
-  scale_colour_manual(values = "blue")+
-  scale_fill_manual(values = "blue")
+ggplot(compare.table,aes(x = `exp cumhaz`, y = `KM cumhaz`))+
+  geom_step()+
+  geom_abline()
 
-p.t2 <- ggplot(actg_event[actg_event$tx == 0,])+
-  geom_histogram(aes(x = time, y = ..density.., fill = "Data"), alpha = 0.5)+
-  stat_function(aes(colour = "Exp. Model"), fun = dexp, n = dim(actg_event)[1], args = list(rate = t0$par))+
-  ggtitle("No Treatment")+
-  theme(legend.position = "top")+
-  lims(x = c(0,max(actg_event$time)+10), y = c(0,0.012))+
-  scale_colour_manual(values = "red")+
-  labs(fill = "", colour = "", x = "Time to Event")+
-  scale_fill_manual(values = "red")
+kaplan.meier.treatment <- survfit(Surv(time, event) ~ tx, data = actg)
+est.cumhaz.tx <- pexp(kaplan.meier.treatment$time[-(1:228)], rate = 1/theta.hat.tx)
+compare.table.treatment <- tibble("time" = kaplan.meier.treatment$time[-(1:228)], "KM cumhaz tx" = kaplan.meier.treatment$cumhaz[-(1:228)], "exp cumhaz tx" = est.cumhaz.tx)
 
-grid.arrange(p.both, p.t1,p.t2, nrow = 1)
+ggplot(compare.table.treatment,aes(x = `exp cumhaz tx`, y = `KM cumhaz tx`))+
+  geom_step()+
+  geom_abline()
+
+#weibull test for tx = 1
+kaplan.meier.treatment <- survfit(Surv(time, event) ~ tx, data = actg)
+time <- 1:max(kaplan.meier.treatment$time[-(1:228)])
+sigma <- est.wei$par[2]
+theta <- est.wei$par[1]
+p <- sigma^(-1)*time^(1/sigma-1)*theta^(-1/sigma) * exp(-time/theta)^(1/sigma)
+P <- exp(-(time/theta)^(1/sigma))
+wei.cumhaz.tx <- cumsum(p/P)[kaplan.meier.treatment$time[-(1:228)]]
+compare.table.treatment <- tibble("time" = kaplan.meier.treatment$time[-(1:228)], "KM cumhaz tx" = kaplan.meier.treatment$cumhaz[-(1:228)], "weibull cumhaz tx" = wei.cumhaz.tx)
+
+ggplot(compare.table.treatment,aes(x = `weibull cumhaz tx`, y = `KM cumhaz tx`))+
+  geom_step()+
+  geom_abline()+
+  theme_bw()+
+  ggtitle("Weibull Survival Regression Model [Treatment Group]")+
+  labs(y = "Kaplan Meier Cumulative Hazard", x = "Weibull Regression Model Cumulative Hazard")
 ```
 
 #### Compared the likelihood for the above models and conclude
