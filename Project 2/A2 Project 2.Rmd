@@ -1,0 +1,90 @@
+---
+title: "A2 Project 2"
+author: "Johnsen & Johnsen"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+```{r, include = F}
+knitr::opts_chunk$set(warning = F, fig.height = 4, message = F, dpi = 500)
+rm(list = ls())
+library(lubridate)
+library(latex2exp)
+library(circular)
+library(tidyverse)
+library(reshape)
+library(pheatmap)
+library(openair)
+library(stringr)
+library(numDeriv)
+library(gridExtra)
+library(openair)
+library(PowerNormal)
+library(sn)
+library(gnorm)
+library(emg)
+library(survival)
+library(survminer)
+
+
+if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
+  setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
+} else {
+  setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
+}
+
+source("testDistribution.R")
+```
+
+# Projekt 2: Survival Data
+
+## Analysis of the Binary Data
+
+### Read the data Logistic.txt into R.
+
+```{r}
+log.data <- read.table("Logistic.txt", header=TRUE, sep="", 
+                       as.is=TRUE)
+```
+
+
+### Fit a logistic regression model for the binary outcome AIDS=”yes” versus AIDS=”no” with the explanatory variable treatment with AZT (Yes, NO). Present the odds ratio for the effect of AZT on AIDS with 95% confidence interval and interpret the result in words
+
+### Test the hypothesis of no effect of AZT on AIDS using:
+
+* The likelihood ratio test
+* The Wald test
+* The score test
+
+
+## Analysis of the survival time data
+
+### Descriptive statistics
+
+#### Read the data actg320.txt into R
+
+#### How many patients got AIDS or died in the two treatment groups? And how long was the total follow-up time in the two groups?
+
+#### Plot the survival functions in the two treatment groups, which group seems to be doing best?
+
+#### Plot the cumulative incidence functions for the two groups, which plot would you prefer?
+
+#### Compare the survival in the two treatment groups using a log-rank test.
+
+
+### Parametric survival models
+
+#### Fit parametric survival models containing treatment (tx) and CD4 count (cd4) as explanatory variables
+
+* Try using the exponential, Weibull and log-logistic models, which one gave the best fit (and why)?   
+
+
+#### Using the survival model you chose, make a table of estimates and their 95% confidence intervals
+
+
+#### Using your model compute the time ratio for the treatment effect. Sim- ilarly, compute the time ratio for the effect of increasing the CD4 count with 50. In both cases unceartainty evaluation (e.g. confidence inter- vals) should be included. Interpret the results in words
+
+
+#### Assess the goodness of fit of this model using a plot based on the Cox Snell residuals
+
+
+#### Give a graphical presentation of your model
