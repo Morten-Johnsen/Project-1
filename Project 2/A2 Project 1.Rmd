@@ -1,0 +1,138 @@
+---
+title: "A2 Project 1"
+author: "Johnsen & Johnsen"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+Setting working directories and loading the data. Data is also normalized.
+
+```{r}
+library(ggplot2)
+
+if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
+  setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
+} else {
+  setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
+  #setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1/Project 2")
+  #source("testDistribution.R")
+}
+
+D <- read.table("tuno.txt", header=TRUE, sep=" ", 
+                as.is=TRUE)
+
+D$date <- as.Date("2003-01-01")-1+D$r.day
+D$pow.obs.norm <- D$pow.obs/5000
+```
+
+Data is transformed to be normal using transformation 1 in description of assignment 1:
+$$
+y^{(\lambda)}=\frac{1}{\lambda}log\left(\frac{y^\lambda}{1-y^\lambda}\right); \lambda > 0
+$$
+Below can be seen qq-plots comparing the normalized data before and after transformation to allow for a better understanding of the motivation behind the transformation.
+
+```{r}
+#lambdas <- seq(-0.5,0.5,by=0.01)
+#library(MASS)
+#boxcox(lm(D$pow.obs.norm~1), lambda=lambdas)
+
+#Define transformation function
+Trans.eq1 <- function(lambda, y){
+  y_lambda <- 1/lambda * log(y^lambda/(1-y^lambda))#, lambda > 0
+  return(y_lambda)
+}
+#Optimization function
+#Måske er det bedre at lave nogle undersøgelser selv frem for bare at optimere lambda (Overvej til senere).
+#se kode fra lecture 4 linje 5-73
+lambda_NLL <- function(lambda, x = D$pow.obs.norm){
+  y <- Trans.eq1(lambda, x)
+  NLL <- -as.numeric(shapiro.test(y)$statistic)
+  return(NLL)
+}
+lambda.hat <- nlminb(start = 0.2, objective = lambda_NLL)
+#round to two decimal points.
+lambda <- round(lambda.hat$par, 2)
+D$transformed.pow.obs.norm <- Trans.eq1(lambda, D$pow.obs.norm)
+
+#Check qqplot:
+par(mfrow = c(2,2))
+qqnorm(D$pow.obs.norm)
+qqline(D$pow.obs.norm)
+hist(D$pow.obs.norm)
+qqnorm(D$transformed.pow.obs.norm)
+qqline(D$transformed.pow.obs.norm)
+hist(D$transformed.pow.obs.norm)
+```
+Two models will be produced: a non-normal beta or gamma regression model or the normalized data and a normal linear regression model of the transformed, normalized data.
+
+First the non-normal:
+```{r}
+#gamma's pretty bad. Maybe beta would be better?
+glmfit2 <- glm( (pow.obs.norm ~ I(ws30^2)), data = D, family = Gamma)
+summary(glmfit2)
+D$glmpred2 <- ( glmfit2$coefficients[1] + glmfit2$coefficients[2] * D$ws30^2)^(-1)
+
+ggplot(data = D)+
+  geom_point(aes(x=ws30, y=pow.obs.norm, colour="Data"))+
+  geom_line(aes(x=ws30, y=glmpred2, colour="Model2"))+
+  labs(x = "Wind speeds", y="Norm power obs", colour = "")
+```
+This can also be done by hand. See p. 163-65 for reference. Exponential family regression models estimate the log-likelihood contribution of an outcome $y_i$ as seen below:
+$$
+log L(\theta_i,\phi)=\frac{y_i\theta_i-A(\theta_i)}{\phi}+c(y_i,\phi)
+$$
+Here, $A(\theta_i)$ is defined as such that its derivative is the mean $E_{y_1}=A'(\theta_i)=\mu_i$. $\phi$ is the dispersion parameter, where $var(y_i)=\phi A''(\theta_i)=\phi v(\mu_i)$. To use this general exponential family for regression analysis we only have to specify $A(\theta_i)$ and a link function $h(\mu_i)$. The reason as to why $c(y_i,\phi)$ can be neglected is that the term disappears when determining the score function anyways.??? KOMMENTAR
+
+
+
+Now to the normal linear model:
+
+```{r cars}
+transfit1 <- lm( (D$transformed.pow.obs.norm ~ ws30), data = D ) #good for comparison
+transfit12 <- lm( (D$transformed.pow.obs.norm ~ ws30 + I(ws30^2)), data = D) #brilliant
+transfit2 <- lm( (D$transformed.pow.obs.norm ~ I(ws30^2)), data = D ) #1. jeg har ladt disse to stå for at illustrere noget med residualerne
+transfit3 <- lm( (D$transformed.pow.obs.norm ~ I(ws30^3)), data = D ) #2. 
+
+summary(transfit1)
+summary(transfit12)
+
+D$transformed.pred1 <- transfit1$coefficients[1] + transfit1$coefficients[2] * D$ws30
+D$transformed.pred12 <- transfit12$coefficients[1] + transfit12$coefficients[2] * D$ws30 + transfit12$coefficients[3] * D$ws30^2
+
+ggplot(data = D)+
+  geom_point(aes(x=ws30, y=transformed.pow.obs.norm, colour="Data"))+
+  geom_line(aes(x=ws30, y=transformed.pred1, colour="Model1"))+
+  geom_line(aes(x=ws30, y=transformed.pred12, colour="Model12"))+
+  labs(x = "Wind speeds", y="Transformed, norm power obs", colour = "")
+
+summary(lm( (D$transformed.pow.obs.norm ~ ws30 + I(ws30^2) + wd30), data = D)) #simply a check with the final model to make sure that wd still is irrelevant as regressor
+```
+
+Tjek af modellerne:
+
+```{r pressure, echo=FALSE}
+par(mfrow=c(2,2))
+plot(D$ws30, transfit1$residuals)
+plot(D$ws30, transfit2$residuals)
+plot(D$ws30, transfit3$residuals)
+plot(D$ws30, transfit12$residuals)
+```
+
+Normal linear model by hand and by optimisation:
+```{r}
+D$base <- 1 #slide 15 for all of this
+X <- as.matrix(data.frame(D$base, D$ws30, D$ws30^2))
+Y <- D$transformed.pow.obs.norm
+betas <- solve( (t(X)%*%X) ) %*% t(X) %*% Y
+
+NLL.norm.lin <- function(p, regr1, regr2, response){
+  mu <- p[1] + p[2]*regr1 + p[3]*regr2
+  sigma <- sqrt( 1/length(response) * sum( (response - mu)^2  ) )
+  return( -sum( dnorm( x = response, mean = mu, sd = sigma, log = T ) )  )
+}
+norm.lin.par <- nlminb(c(1,1,1), objective = NLL.norm.lin, regr1 = D$ws30, regr2 = D$ws30^2, response = Y)
+
+round( rbind(transfit12$coefficients,betas[1:3],norm.lin.par$par), digits=6)
+```
+
+
