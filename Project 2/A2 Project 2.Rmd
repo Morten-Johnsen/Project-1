@@ -2,7 +2,10 @@
 title: "A2 Project 2"
 author: "Johnsen & Johnsen"
 date: "`r Sys.Date()`"
-output: pdf_document
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
 ```{r, include = F}
 knitr::opts_chunk$set(warning = F, fig.height = 4, message = F, dpi = 500)
@@ -24,15 +27,6 @@ library(gnorm)
 library(emg)
 library(survival)
 library(survminer)
-
-
-if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
-  setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
-} else {
-  setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
-}
-
-source("testDistribution.R")
 ```
 
 # Projekt 2: Survival Data
@@ -42,18 +36,139 @@ source("testDistribution.R")
 ### Read the data Logistic.txt into R.
 
 ```{r}
+# if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
+#   setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/Project 2/")
+# } else {
+#   setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
+# }
+
 log.data <- read.table("Logistic.txt", header=TRUE, sep="", 
                        as.is=TRUE)
+
+source("testDistribution.R")
+```
+
+### Fit a logistic regression model for the binary outcome AIDS=”yes” versus AIDS=”no” with the explanatory variable treatment with AZT (Yes, NO). Present the odds ratio for the effect of AZT on AIDS with 95% confidence interval and interpret the result in words
+
+The logistic regression model is given by the likelihood function:
+$$
+L(\theta) = \prod_i \left( \dfrac{\theta_i}{1-\theta_i} \right)^{y_i}(1-\theta_i)
+$$
+Here $\theta$ is calculated as:
+$$
+\theta_i = \dfrac{e^{\beta_0 + \beta_1 t_{AZT}}}{1 + e^{\beta_0 + \beta_1 t_{AZT}}}
+$$
+
+```{r}
+nll.log <- function(theta, event, n, treatment){
+  
+  beta0 <- theta[1]
+  beta1 <- theta[2]
+  
+  theta <- exp(beta0 + beta1 * treatment)/(1 + exp(beta0 + beta1 * treatment))
+  
+  nll <- -sum(log(theta)*event  + log(1-theta)*(n - event))
+  return(nll)
+}
+
+# For AZT treatment:
+log.reg <- nlminb(start = c(1,1), objective = nll.log, event = log.data$AIDS_yes, n = log.data$n, treatment = c(1,0))
+
+beta0 <- log.reg$par[1]
+beta1 <- log.reg$par[2]
 ```
 
 
-### Fit a logistic regression model for the binary outcome AIDS=”yes” versus AIDS=”no” with the explanatory variable treatment with AZT (Yes, NO). Present the odds ratio for the effect of AZT on AIDS with 95% confidence interval and interpret the result in words
+```{r}
+logistic <- data.frame("AZT" = c(rep(1,170), rep(0,168))
+                       ,"AIDS_yes" = c(rep(c(1,0),c(25,170-25)), rep(c(1,0), c(44, 168-44))))
+
+fit.glm <- glm(AIDS_yes ~ AZT, data = logistic, family = binomial)
+print(cat(paste0("with glm model: ", coef(fit.glm)
+  ,"\nBy hand (according to slide 19 lect 4): "
+  ,"\nbeta_0 = ", log.reg$par[1], ", beta_1 = ", log.reg$par[2])))
+
+```
+
+Calculating 95\% wald confidence interval for $\beta_1$ and subsequently for the odds ratio.
+```{r}
+sd <- sqrt(diag(solve(hessian(func = nll.log, x = c(beta0, beta1), event = log.data$AIDS_yes, n = log.data$n, treatment = c(1,0)))))
+sd.beta0 <- sd[1]
+sd.beta1 <- sd[2]
+
+beta1.wald.CI <- beta1 + c(-1,1)*dnorm(0.975)*sd.beta1
+```
+
+
+Odds ratio = $exp(\beta_1)$ = `r exp(beta1)`, 95% CI [`r exp(c(beta1.wald.CI[1], beta1.wald.CI[2]))`]. Thus for the individuals receiving the AZT treatment, the odds of developing AIDS or dying is reduced by a factor 0.486 95% CI [0.45, 0.52].
+```{r, include = F}
+exp(beta1)
+exp(c(beta1.wald.CI[1], beta1.wald.CI[2]))
+```
+
 
 ### Test the hypothesis of no effect of AZT on AIDS using:
 
 * The likelihood ratio test
 * The Wald test
 * The score test
+
+#### Likelihood ratio test
+
+Calculate the objective value based on no treatment effect:
+```{r}
+nll.log.no.effect <- function(theta, event, n, treatment){
+  
+  beta0 <- theta[1]
+  
+  theta <- exp(beta0)/(1 + exp(beta0))
+  
+  nll <- -sum(log(theta)*event  + log(1-theta)*(n - event))
+  return(nll)
+}
+
+log.reg.no.effect <- nlminb(start = 1, objective = nll.log.no.effect
+                        , event = sum(log.data$AIDS_yes)
+                        , n = sum(log.data$n), treatment = 0)
+```
+Run the LRT (assuming regularity of the likelihoods (*page 36*)):
+```{r}
+(chi.squared <- - 2 * (log.reg$objective - log.reg.no.effect$objective))
+(p.value <- 1 - pchisq(chi.squared, df = 1))
+```
+
+#### Wald test statistic
+
+Calculating the wald test statistic (*p. 156*, or *p. 42 with $\theta_0 = 0$*).
+```{r}
+(waldTestStatistic <- beta1/sd.beta1)
+(wald.p.value <- 2*pnorm(waldTestStatistic))
+```
+
+#### The score test
+
+Calculating the score function for the logistic regression model.
+$$
+S(\theta) = \dfrac{1}{\theta} \sum_i y_i + \dfrac{1}{1+\theta} \sum_i 1-y_i
+$$
+```{r}
+#ikke færdig
+scoreFunction <- function(theta){
+  beta0 <- theta[1]
+  beta1 <- theta[2]
+  event <- log.data$AIDS_yes
+  n <- log.data$n
+  treatment <- c(1,0)
+  
+  theta <- exp(beta0 + beta1 * treatment)/(1 + exp(beta0 + beta1 * treatment))
+  
+  score <- -sum(1/theta * event + 1/(1 + theta) * (n - event))
+  return(score)
+}
+
+scoreFunction(log.reg$par) * hessian(func = scoreFunction, x = log.reg$par)
+scoreFunction(log.reg$par)
+```
 
 
 ## Analysis of the survival time data
@@ -62,14 +177,70 @@ log.data <- read.table("Logistic.txt", header=TRUE, sep="",
 
 #### Read the data actg320.txt into R
 
+Read in the data:
+```{r}
+#tx: Treatment indicator. 1 = New treatment, 0 = Control treatment
+#event: Indicator for AIDS or death. 1 = AIDS diagnosis or death, 0 = Otherwise
+#time: Time to AIDS diagnosis or death. Days
+#så tiden for event = 0 må angive at personen har været med i studiet time[X] dage uden at være enten død eller fået AIDS.
+actg320 <- read.table("actg320.txt", header=TRUE, sep="", 
+                      as.is=TRUE)
+
+#select time, event and tx as they are the only relevant variables in this project
+actg <- actg320 %>%
+  dplyr::select(time, event, tx, cd4)
+```
+
+
 #### How many patients got AIDS or died in the two treatment groups? And how long was the total follow-up time in the two groups?
+
+```{r}
+actg %>%
+  group_by(tx) %>%
+  summarise("Got AIDS or DIED" = sum(event),
+            "Proportion" = sum(event)/n(),
+            "Participants Given the Treatment" = n(),
+            "Total follow up time" = sum(time))
+```
+
 
 #### Plot the survival functions in the two treatment groups, which group seems to be doing best?
 
+The treatment group seems to be doing the best (consider making this plot by hand instead of using survfit).
+
+```{r}
+kaplan.meier <- survfit(Surv(time, event) ~ tx, data = actg)
+ggsurvplot(kaplan.meier
+                   , data = actg
+                   , conf.int = T
+                   , risk.table = "abs_pct"
+                   , ylim = c(0.8,1)
+                   ,ggtheme = theme_bw()
+                   ,legend.labs = c("No Treatment", "Treatment"))
+```
+
+
 #### Plot the cumulative incidence functions for the two groups, which plot would you prefer?
+
+```{r}
+
+ggsurvplot(kaplan.meier
+                   , data = actg
+                   , conf.int = T
+                   , risk.table = "abs_pct"
+                   ,ggtheme = theme_bw()
+                   ,fun = "cumhaz"
+                   ,legend.labs = c("No Treatment", "Treatment"))
+```
 
 #### Compare the survival in the two treatment groups using a log-rank test.
 
+See slides 31-33 from week 6 for calculations by hand.
+
+```{r}
+survdiff(Surv(time, event) ~ tx, data = actg)
+```
+p-value of 0.001, thus there is a significant difference between the two treatment groups based on a significance level of 0.05.
 
 ### Parametric survival models
 
@@ -77,14 +248,139 @@ log.data <- read.table("Logistic.txt", header=TRUE, sep="",
 
 * Try using the exponential, Weibull and log-logistic models, which one gave the best fit (and why)?   
 
+```{r}
+exp.model <- survreg(Surv(time, event) ~ tx + cd4, data = actg, dist = "exponential")
+weibull.model <- survreg(Surv(time, event) ~ tx + cd4, data = actg, dist = "weibull")
+log.logistic.model <- survreg(Surv(time, event) ~ tx + cd4, data = actg, dist = "loglogistic")
+```
+
+```{r}
+summary(exp.model)
+```
+```{r}
+summary(weibull.model)
+```
+ 
+```{r}
+summary(log.logistic.model)
+```
+
+Examining the fits of the models through the cox-snell residuals
+
+```{r}
+par(mfrow = c(1,3))
+actg$cox.snell.exp <- actg$time * exp(- exp.model$linear.predictors)
+fit.exp <- survfit(Surv(cox.snell.exp, event == 1) ~ 1, data = actg)
+plot(fit.exp$time, -log(fit.exp$surv), main = "Exponential Model")
+abline(a=0, b=1)
+
+#slide 51 week 7
+actg$cox.snell.wei <- exp((log(actg$time) - weibull.model$linear.predictors) / weibull.model$scale)
+fit.wei <- survfit(Surv(cox.snell.wei, event == 1) ~ 1, data = actg)
+plot(fit.wei$time, -log(fit.wei$surv), main = "Weibull Model")
+abline(a=0, b=1)
+
+#slide 55 week 7 + slide 33 week 7 + slide 65 week 7
+actg$cox.snell.loglog <- log( 1 + exp((log(actg$time) - log.logistic.model$linear.predictors) / log.logistic.model$scale))
+fit.loglog <- survfit(Surv(cox.snell.loglog, event == 1) ~ 1, data = actg)
+plot(fit.loglog$time, -log(fit.loglog$surv), main = "Log-logistic Model")
+abline(a=0, b=1)
+```
+Weibull and log-logistic seem quite similar. We test if the scale parameter of the weibull.
+
+Use AIC to compare the models (exp excluded due to poor cox-snell fit):
+```{r}
+2 * weibull.model$loglik[1] + 2 * (3 + 1) #3 parms + scale
+
+2 * log.logistic.model$loglik[1] + 2 * (3 + 1) #3 parms + scale
+```
 
 #### Using the survival model you chose, make a table of estimates and their 95% confidence intervals
 
+```{r}
+weibull.model$coefficients
+confint(weibull.model)
+```
 
-#### Using your model compute the time ratio for the treatment effect. Sim- ilarly, compute the time ratio for the effect of increasing the CD4 count with 50. In both cases unceartainty evaluation (e.g. confidence inter- vals) should be included. Interpret the results in words
+And for the scale parameter:
+```{r}
+exp(0.24834)
+exp(0.24834 + c(-1,1)*qnorm(0.975)*0.09715)
+```
+
+
+#### Using your model compute the time ratio for the treatment effect. Similarly, compute the time ratio for the effect of increasing the CD4 count with 50. In both cases unceartainty evaluation (e.g. confidence intervals) should be included. Interpret the results in words
+
+For the treatment effect:
+```{r}
+exp(0.84012750)
+#95% CI
+exp(c(0.27992876, 1.40032624))
+```
+The treatment increase the median survival time by a factor 2.32 95% CI [1.32; 4.06].
+
+
+For increasing the cd4 count by 50:
+```{r}
+weibull.model$coefficients
+confint(weibull.model)
+
+exp(50*0.02063062)
+#95% CI
+exp(c(50*0.01319748, 50*0.02806376))
+```
+
+Here we see that by increasing the cd4 count by 50, the median survival time is increased by a factor 2.8 95% CI [1.93,4.07].
 
 
 #### Assess the goodness of fit of this model using a plot based on the Cox Snell residuals
 
+This plot was already made earlier, but here it is again.
+
+```{r}
+par(mfrow = c(1,1))
+
+actg$cox.snell.wei <- exp((log(actg$time) - weibull.model$linear.predictors) / weibull.model$scale)
+fit.wei <- survfit(Surv(cox.snell.wei, event == 1) ~ 1, data = actg)
+plot(fit.wei$time, -log(fit.wei$surv), main = "Weibull Model")
+abline(a=0, b=1)
+```
 
 #### Give a graphical presentation of your model
+
+```{r}
+actg$cd4.cats <- cut(actg$cd4, breaks = c(0,100,max(actg$cd4)))
+survival.functions <- survfit(Surv(time, event) ~ tx + cd4.cats, data = actg)
+
+actg$cd4.category.num <- 0
+actg$cd4.category.num[actg$cd4 < 100] <- 1
+actg$cd4.category.num[actg$cd4 >= 100] <- 2
+
+wei.survival <- function(theta, time, tx, cd4){
+  beta0 <- theta[1]
+  beta1 <- theta[2]
+  beta2 <- theta[3]
+  scale <- theta[4]
+  
+  out <- exp(-(time/exp(beta0 + beta1*tx + beta2*cd4))^(1/scale))
+  return(out)
+}
+
+#for fixed values
+theta <- c(weibull.model$coefficients,weibull.model$scale)
+time.steps <- seq(0,max(actg$time),0.5)
+first.sim <- wei.survival(theta, time.steps, 0, median(actg$cd4[actg$cd4 < 100 & actg$tx == 0]))
+second.sim <- wei.survival(theta, time.steps, 0, median(actg$cd4[actg$cd4 > 100 & actg$tx == 0]))
+third.sim <- wei.survival(theta, time.steps, 1, median(actg$cd4[actg$cd4 < 100 & actg$tx == 1]))
+fourth.sim <- wei.survival(theta, time.steps, 1, median(actg$cd4[actg$cd4 > 100 & actg$tx == 0]))
+
+#wei.survival(c(weibull.model$coefficients,weibull.model$scale), actg$time, actg$tx, actg$cd4)
+
+plot(survival.functions, conf.int = T, col = 2:5, ylim = c(0.75,1), lwd = 1)
+grid()
+lines(time.steps, first.sim, col = 2 , lwd = 3)
+lines(time.steps, second.sim, col = 3, lwd = 3)
+lines(time.steps, third.sim, col = 4 , lwd = 3)
+lines(time.steps, fourth.sim, col = 5, lwd = 3)
+```
+
