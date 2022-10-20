@@ -251,18 +251,88 @@ p-value of 0.001, thus there is a significant difference between the two treatme
 ```{r}
 exp.model <- survreg(Surv(time, event) ~ tx + cd4, data = actg, dist = "exponential")
 weibull.model <- survreg(Surv(time, event) ~ tx + cd4, data = actg, dist = "weibull")
-log.logistic.model <- survreg(Surv(time, event) ~ tx + cd4, data = actg, dist = "loglogistic")
+loglogistic.model <- survreg(Surv(time, event) ~ tx + cd4, data = actg, dist = "loglogistic")
 ```
 
 ```{r}
 summary(exp.model)
+
+nll.exp <- function(theta
+                    , time = actg$time
+                    , event = actg$event
+                    , treatment = actg$tx
+                    , cd4 = actg$cd4){
+  beta0 <- theta[1]
+  beta1 <- theta[2]
+  beta2 <- theta[3]
+  
+  h <- exp(- beta0 - beta1 * treatment - beta2 * cd4)
+  H <- time/exp(beta0 + beta1 * treatment + beta2 * cd4)
+  nll <- -sum(event*log(h) - H)
+  return(nll)
+}
+
+exp.model.manual <- nlminb(start = c(1,1,1), objective = nll.exp)
+sd.exp.manual <- sqrt(diag(solve(hessian(func = nll.exp, x = exp.model.manual$par))))
+exp.model.manual.AIC <- - 2 * exp.model.manual$objective - 2 * 3
+
 ```
+##### Weibull model
+
+Use:
+slide 10 for f(t), S(t), h(t) and H(t) relationships, slide 19 for general log-likelihood expression for censored data, slide 55 for S(t) and *z*, slide 60 for h(t).
+
 ```{r}
 summary(weibull.model)
+
+nll.wei <- function(theta
+                    , time = actg$time
+                    , event = actg$event
+                    , treatment = actg$tx
+                    , cd4 = actg$cd4){
+  sigma <- theta[1]
+  beta0 <- theta[2]
+  beta1 <- theta[3]
+  beta2 <- theta[4]
+  
+  h <-1/sigma * time^(1/sigma - 1) * exp(-1/sigma * (beta0 + beta1 * treatment + beta2 * cd4))
+  H <- time^(1/sigma) * exp(-1/sigma * (beta0 + beta1 * treatment + beta2 * cd4))
+  nll <- -sum(event*log(h) - H)
+  return(nll)
+}
+
+weibull.model.manual <- nlminb(start = c(1,1,1,1), objective = nll.wei)
+sd.weibull.manual <- sqrt(diag(solve(hessian(func = nll.wei, x = weibull.model.manual$par))))
+weibull.model.manual.AIC <- - 2 * weibull.model.manual$objective + 2 * length(weibull.model.manual$par)
 ```
  
 ```{r}
-summary(log.logistic.model)
+summary(loglogistic.model)
+
+nll.loglog <- function(theta
+                    , time = actg$time
+                    , event = actg$event
+                    , treatment = actg$tx
+                    , cd4 = actg$cd4){
+  sigma <- theta[1]
+  beta0 <- theta[2]
+  beta1 <- theta[3]
+  beta2 <- theta[4]
+  
+  z <- (log(time) - (beta0 + beta1 * treatment + beta2 * cd4))/sigma
+  
+  h <- exp(z)/(1 + exp(z)) * 1/sigma * 1/time
+  S <- 1 / (1 + exp(z))
+  H <- -log(S)
+  #H <- time^(1/sigma) * exp(-1/sigma * (beta0 + beta1 * treatment + beta2 * cd4))
+  nll <- -sum(event*log(h) - H)
+  return(nll)
+}
+
+loglogistic.model.manual <- nlminb(start = c(1,1,1,1), objective = nll.loglog)
+sd.loglogistic.manual <- sqrt(diag(solve(hessian(func = nll.loglog, x = loglogistic.model.manual$par))))
+loglogistic.model.manual.AIC <- - 2 * loglogistic.model.manual$objective + 2 * length(loglogistic.model.manual$par)
+
 ```
 
 Examining the fits of the models through the cox-snell residuals
@@ -290,9 +360,9 @@ Weibull and log-logistic seem quite similar. We test if the scale parameter of t
 
 Use AIC to compare the models (exp excluded due to poor cox-snell fit):
 ```{r}
-2 * weibull.model$loglik[1] + 2 * (3 + 1) #3 parms + scale
+2 * weibull.model$loglik[2] + 2 * (3 + 1) #3 parms + scale
 
-2 * log.logistic.model$loglik[1] + 2 * (3 + 1) #3 parms + scale
+2 * log.logistic.model$loglik[2] + 2 * (3 + 1) #3 parms + scale
 ```
 
 #### Using the survival model you chose, make a table of estimates and their 95% confidence intervals
