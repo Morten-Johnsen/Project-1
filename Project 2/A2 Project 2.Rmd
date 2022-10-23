@@ -290,7 +290,7 @@ nll.wei <- function(theta
                     , event = actg$event
                     , treatment = actg$tx
                     , cd4 = actg$cd4){
-  sigma <- theta[1]
+  sigma <- exp(theta[1])  #estimate scale parameter on log-scale
   beta0 <- theta[2]
   beta1 <- theta[3]
   beta2 <- theta[4]
@@ -303,7 +303,7 @@ nll.wei <- function(theta
 
 weibull.model.manual <- nlminb(start = c(1,1,1,1), objective = nll.wei)
 sd.weibull.manual <- sqrt(diag(solve(hessian(func = nll.wei, x = weibull.model.manual$par))))
-weibull.model.manual.AIC <- - 2 * weibull.model.manual$objective + 2 * length(weibull.model.manual$par)
+weibull.model.manual.AIC <- - 2 * weibull.model.manual$objective + 2 * length(weibull.model.manual$par) #3 parms + scale
 ```
  
 ```{r}
@@ -331,8 +331,7 @@ nll.loglog <- function(theta
 
 loglogistic.model.manual <- nlminb(start = c(1,1,1,1), objective = nll.loglog)
 sd.loglogistic.manual <- sqrt(diag(solve(hessian(func = nll.loglog, x = loglogistic.model.manual$par))))
-loglogistic.model.manual.AIC <- - 2 * loglogistic.model.manual$objective + 2 * length(loglogistic.model.manual$par)
-
+loglogistic.model.manual.AIC <- - 2 * loglogistic.model.manual$objective + 2 * length(loglogistic.model.manual$par) #3 parms + scale
 ```
 
 Examining the fits of the models through the cox-snell residuals
@@ -341,63 +340,85 @@ Examining the fits of the models through the cox-snell residuals
 par(mfrow = c(1,3))
 actg$cox.snell.exp <- actg$time * exp(- exp.model$linear.predictors)
 fit.exp <- survfit(Surv(cox.snell.exp, event == 1) ~ 1, data = actg)
-plot(fit.exp$time, -log(fit.exp$surv), main = "Exponential Model")
-abline(a=0, b=1)
+plot(fit.exp$time, -log(fit.exp$surv), main = "Exponential Cox-Snell Check"
+     ,xlab = TeX("$r_i$")
+     ,ylab = TeX("-log($S_{KM}(r_i)$)"))
+grid()
+abline(a=0, b=1, col = 2, lwd = 2)
 
-#slide 51 week 7
-actg$cox.snell.wei <- exp((log(actg$time) - weibull.model$linear.predictors) / weibull.model$scale)
+#slide 51 week 7 for weibull cox-snell
+beta <- t(t(weibull.model.manual$par[2:4]))
+x <- as.matrix(cbind(1, actg$tx, actg$cd4))
+y.pred <- x %*% beta
+y <- log(actg$time)
+
+actg$r <- exp((y - y.pred)/sigma)
+#slide 35 week 7 for the plot. [r_i, log(S_KM(r_i))], should yield a linear relationship with slope = 1.
 fit.wei <- survfit(Surv(cox.snell.wei, event == 1) ~ 1, data = actg)
-plot(fit.wei$time, -log(fit.wei$surv), main = "Weibull Model")
-abline(a=0, b=1)
+#the output from the survfit function: time = r_i (as we input r_i as time). 
+#the 'surv' output is the kaplan meier survival function of r_i:
+plot(fit.wei$time, -log(fit.wei$surv), main = "Weibull Cox-Snell Check"
+     ,xlab = TeX("$r_i$")
+     ,ylab = TeX("-log($S_{KM}(r_i)$)"))
+grid()
+abline(a=0, b=1, col = 2, lwd = 2)
 
 #slide 55 week 7 + slide 33 week 7 + slide 65 week 7
-actg$cox.snell.loglog <- log( 1 + exp((log(actg$time) - log.logistic.model$linear.predictors) / log.logistic.model$scale))
+actg$cox.snell.loglog <- log( 1 + exp((log(actg$time) - loglogistic.model$linear.predictors) / loglogistic.model$scale))
 fit.loglog <- survfit(Surv(cox.snell.loglog, event == 1) ~ 1, data = actg)
-plot(fit.loglog$time, -log(fit.loglog$surv), main = "Log-logistic Model")
-abline(a=0, b=1)
+plot(fit.loglog$time, -log(fit.loglog$surv), main = "Log-logistic Cox-Snell Check"
+     ,xlab = TeX("$r_i$")
+     ,ylab = TeX("-log($S_{KM}(r_i)$)"))
+grid()
+abline(a=0, b=1, col = 2, lwd = 2)
 ```
-Weibull and log-logistic seem quite similar. We test if the scale parameter of the weibull.
+Weibull and log-logistic seem quite similar.
 
 Use AIC to compare the models (exp excluded due to poor cox-snell fit):
 ```{r}
-2 * weibull.model$loglik[2] + 2 * (3 + 1) #3 parms + scale
-
-2 * log.logistic.model$loglik[2] + 2 * (3 + 1) #3 parms + scale
+cat("Weibull Regression Model AIC: ", weibull.model.manual.AIC,
+    "\nLog-logistic Regression Model AIC: ", loglogistic.model.manual.AIC)
 ```
 
 #### Using the survival model you chose, make a table of estimates and their 95% confidence intervals
 
 ```{r}
-weibull.model$coefficients
-confint(weibull.model)
+weibull.upper <- as.numeric(weibull.model.manual$par + qnorm(0.975)*sd.weibull.manual)
+weibull.lower <- as.numeric(weibull.model.manual$par - qnorm(0.975)*sd.weibull.manual)
+
+cat("beta_0 = ", weibull.model.manual$par[2], "95% CI [",weibull.lower[2],", ",weibull.upper[2],"]"
+    ,"\nbeta_1 = ", weibull.model.manual$par[3], "95% CI [",weibull.lower[3],", ",weibull.upper[3],"]"
+    ,"\nbeta_2 = ", weibull.model.manual$par[4], "95% CI [",weibull.lower[4],", ",weibull.upper[4],"]"
+    ,"\nscale = ", exp(weibull.model.manual$par[1]), "95% CI [",exp(weibull.lower[1]),", ",exp(weibull.upper[1]),"]\n")
 ```
 
-And for the scale parameter:
+Table format:
 ```{r}
-exp(0.24834)
-exp(0.24834 + c(-1,1)*qnorm(0.975)*0.09715)
+tibble("parameter" = c("beta_0", "beta_1", "beta_2", "sigma")
+       , "theta hat" = c(weibull.model.manual$par[2:4], exp(weibull.model.manual$par[1]))
+       , "lower CI (2.5%)" = c(weibull.lower[2:4], exp(weibull.lower[1]))
+       , "upper CI (97.5%)" = c(weibull.upper[2:4], exp(weibull.upper[1])))
 ```
-
+$\theta$ does not span 1, and thus the estimated weibull distribution is significantly different from simply using an exponential distribution.
 
 #### Using your model compute the time ratio for the treatment effect. Similarly, compute the time ratio for the effect of increasing the CD4 count with 50. In both cases unceartainty evaluation (e.g. confidence intervals) should be included. Interpret the results in words
 
 For the treatment effect:
 ```{r}
-exp(0.84012750)
+beta1 <- weibull.model.manual$par[3]
+exp(beta1)
 #95% CI
-exp(c(0.27992876, 1.40032624))
+exp(c(weibull.lower[3], weibull.upper[3]))
 ```
 The treatment increase the median survival time by a factor 2.32 95% CI [1.32; 4.06].
 
 
 For increasing the cd4 count by 50:
 ```{r}
-weibull.model$coefficients
-confint(weibull.model)
-
-exp(50*0.02063062)
+beta2 <- weibull.model.manual$par[4]
+exp(50*beta2)
 #95% CI
-exp(c(50*0.01319748, 50*0.02806376))
+exp(c(50*weibull.lower[4], 50*weibull.upper[4]))
 ```
 
 Here we see that by increasing the cd4 count by 50, the median survival time is increased by a factor 2.8 95% CI [1.93,4.07].
@@ -410,10 +431,11 @@ This plot was already made earlier, but here it is again.
 ```{r}
 par(mfrow = c(1,1))
 
-actg$cox.snell.wei <- exp((log(actg$time) - weibull.model$linear.predictors) / weibull.model$scale)
-fit.wei <- survfit(Surv(cox.snell.wei, event == 1) ~ 1, data = actg)
-plot(fit.wei$time, -log(fit.wei$surv), main = "Weibull Model")
-abline(a=0, b=1)
+plot(fit.wei$time, -log(fit.wei$surv), main = "Weibull Cox-Snell Check"
+     ,xlab = TeX("$r_i$")
+     ,ylab = TeX("-log($S_{KM}(r_i)$)"))
+grid()
+abline(a=0, b=1, col = 2, lwd = 2)
 ```
 
 #### Give a graphical presentation of your model
@@ -437,8 +459,9 @@ wei.survival <- function(theta, time, tx, cd4){
 }
 
 #for fixed values
+step.size <- 0.5
 theta <- c(weibull.model$coefficients,weibull.model$scale)
-time.steps <- seq(0,max(actg$time),0.5)
+time.steps <- seq(0.5,max(actg$time), step.size) #lader den lige starte i 0.5 for at undgå bøvl med h.cum
 first.sim <- wei.survival(theta, time.steps, 0, median(actg$cd4[actg$cd4 < 100 & actg$tx == 0]))
 second.sim <- wei.survival(theta, time.steps, 0, median(actg$cd4[actg$cd4 > 100 & actg$tx == 0]))
 third.sim <- wei.survival(theta, time.steps, 1, median(actg$cd4[actg$cd4 < 100 & actg$tx == 1]))
@@ -446,11 +469,39 @@ fourth.sim <- wei.survival(theta, time.steps, 1, median(actg$cd4[actg$cd4 > 100 
 
 #wei.survival(c(weibull.model$coefficients,weibull.model$scale), actg$time, actg$tx, actg$cd4)
 
-plot(survival.functions, conf.int = T, col = 2:5, ylim = c(0.75,1), lwd = 1)
+par(mfrow = c(1,2))
+plot(survival.functions, cumhaz = T, conf.int = T, col = 2:5, ylim = c(0,0.3), lwd = 1, main = "Weibull Regression Models and Kaplan Meier Cumulative Hazard")
+grid()
+f.weibull.t <- function(t, theta, x, scale){
+  shape <- as.vector(theta %*% x)
+  out <- shape/scale * (t/scale)^(shape-1) * exp(-(t/scale)^shape)
+  return(out)
+}
+
+h.weibull.t <- function(t, theta, treatment, cd4, step.size){
+  sigma <- exp(theta[1])
+  beta0 <- theta[2]
+  beta1 <- theta[3]
+  beta2 <- theta[4]
+  
+  out <- cumsum(1/sigma * t^(1/sigma - 1) * exp(-1/sigma * (beta0 + beta1 * treatment + beta2 * cd4))*step.size)
+  return(out)
+}
+
+lines(time.steps, 1-first.sim, col = 2 , lwd = 3)
+lines(time.steps, h.weibull.t(time.steps, weibull.model.manual$par, 0, median(actg$cd4[actg$cd4 < 100 & actg$tx == 0]), step.size), lwd = 5) #fed. de andre cumulative plots skal laves om til det her format
+lines(time.steps, 1-second.sim, col = 3, lwd = 3)
+lines(time.steps, 1-third.sim, col = 4 , lwd = 3)
+lines(time.steps, 1-fourth.sim, col = 5, lwd = 3)
+legend(legend = c("cd4: 0-100, tx: 0", "cd4: 100+, tx: 0", "cd4: 0-100, tx: 1", "cd4: 100+, tx: 1"), lty = 1, "topleft", col = 2:5, lwd = 4)
+
+plot(survival.functions, conf.int = T, col = 2:5, ylim = c(1,0.7), lwd = 1, main = "Weibull Regression Models and Kaplan Meier Survival Curves")
 grid()
 lines(time.steps, first.sim, col = 2 , lwd = 3)
 lines(time.steps, second.sim, col = 3, lwd = 3)
 lines(time.steps, third.sim, col = 4 , lwd = 3)
 lines(time.steps, fourth.sim, col = 5, lwd = 3)
-```
+legend(legend = c("cd4: 0-100, tx: 0", "cd4: 100+, tx: 0", "cd4: 0-100, tx: 1", "cd4: 100+, tx: 1"), lty = 1, "bottomleft", col = 2:5, lwd = 4)
+
+```   
 
