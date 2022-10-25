@@ -352,9 +352,11 @@ x <- as.matrix(cbind(1, actg$tx, actg$cd4))
 y.pred <- x %*% beta
 y <- log(actg$time)
 
+sigma <- exp(weibull.model.manual$par[1])
+
 actg$r <- exp((y - y.pred)/sigma)
 #slide 35 week 7 for the plot. [r_i, log(S_KM(r_i))], should yield a linear relationship with slope = 1.
-fit.wei <- survfit(Surv(cox.snell.wei, event == 1) ~ 1, data = actg)
+fit.wei <- survfit(Surv(r, event == 1) ~ 1, data = actg)
 #the output from the survfit function: time = r_i (as we input r_i as time). 
 #the 'surv' output is the kaplan meier survival function of r_i:
 plot(fit.wei$time, -log(fit.wei$surv), main = "Weibull Cox-Snell Check"
@@ -372,7 +374,7 @@ plot(fit.loglog$time, -log(fit.loglog$surv), main = "Log-logistic Cox-Snell Chec
 grid()
 abline(a=0, b=1, col = 2, lwd = 2)
 ```
-Weibull and log-logistic seem quite similar.
+Weibull and log-logistic seem quite similar. For both we still see a heavy tail, which is not accounted for in the model.
 
 Use AIC to compare the models (exp excluded due to poor cox-snell fit):
 ```{r}
@@ -406,19 +408,17 @@ $\theta$ does not span 1, and thus the estimated weibull distribution is signifi
 For the treatment effect:
 ```{r}
 beta1 <- weibull.model.manual$par[3]
-exp(beta1)
-#95% CI
-exp(c(weibull.lower[3], weibull.upper[3]))
+
+cat("Time Ratio for the treatment effect: TR(tx = 1, tx = 0) = ", exp(beta1), " 95% CI [",exp(c(weibull.lower[3])),",", exp(c(weibull.upper[3])),"]")
 ```
-The treatment increase the median survival time by a factor 2.32 95% CI [1.32; 4.06].
+Based on this calculation of the time ratio of the treatment effect, it is evident that the treatment increase the median survival time by a factor 2.32 95% CI [1.32; 4.06].
 
 
 For increasing the cd4 count by 50:
 ```{r}
 beta2 <- weibull.model.manual$par[4]
-exp(50*beta2)
-#95% CI
-exp(c(50*weibull.lower[4], 50*weibull.upper[4]))
+
+cat("Time Ratio for the treatment effect: TR(tx = 1, tx = 0) = ", exp(beta2*50), " 95% CI [",exp(c(50*weibull.lower[4])),",", exp(c(50*weibull.upper[4])),"]")
 ```
 
 Here we see that by increasing the cd4 count by 50, the median survival time is increased by a factor 2.8 95% CI [1.93,4.07].
@@ -440,7 +440,7 @@ abline(a=0, b=1, col = 2, lwd = 2)
 
 #### Give a graphical presentation of your model
 
-```{r}
+```{r, fig.width = 16}
 actg$cd4.cats <- cut(actg$cd4, breaks = c(0,100,max(actg$cd4)))
 survival.functions <- survfit(Surv(time, event) ~ tx + cd4.cats, data = actg)
 
@@ -465,7 +465,7 @@ time.steps <- seq(0.5,max(actg$time), step.size) #lader den lige starte i 0.5 fo
 first.sim <- wei.survival(theta, time.steps, 0, median(actg$cd4[actg$cd4 < 100 & actg$tx == 0]))
 second.sim <- wei.survival(theta, time.steps, 0, median(actg$cd4[actg$cd4 > 100 & actg$tx == 0]))
 third.sim <- wei.survival(theta, time.steps, 1, median(actg$cd4[actg$cd4 < 100 & actg$tx == 1]))
-fourth.sim <- wei.survival(theta, time.steps, 1, median(actg$cd4[actg$cd4 > 100 & actg$tx == 0]))
+fourth.sim <- wei.survival(theta, time.steps, 1, median(actg$cd4[actg$cd4 > 100 & actg$tx == 1]))
 
 #wei.survival(c(weibull.model$coefficients,weibull.model$scale), actg$time, actg$tx, actg$cd4)
 
@@ -488,11 +488,10 @@ h.weibull.t <- function(t, theta, treatment, cd4, step.size){
   return(out)
 }
 
-lines(time.steps, 1-first.sim, col = 2 , lwd = 3)
-lines(time.steps, h.weibull.t(time.steps, weibull.model.manual$par, 0, median(actg$cd4[actg$cd4 < 100 & actg$tx == 0]), step.size), lwd = 5) #fed. de andre cumulative plots skal laves om til det her format
-lines(time.steps, 1-second.sim, col = 3, lwd = 3)
-lines(time.steps, 1-third.sim, col = 4 , lwd = 3)
-lines(time.steps, 1-fourth.sim, col = 5, lwd = 3)
+lines(time.steps, h.weibull.t(time.steps, weibull.model.manual$par, 0, median(actg$cd4[actg$cd4 < 100 & actg$tx == 0]), step.size), col = 2 , lwd = 3)
+lines(time.steps, h.weibull.t(time.steps, weibull.model.manual$par, 0, median(actg$cd4[actg$cd4 > 100 & actg$tx == 0]), step.size), col = 3, lwd = 3)
+lines(time.steps, h.weibull.t(time.steps, weibull.model.manual$par, 1, median(actg$cd4[actg$cd4 < 100 & actg$tx == 1]), step.size), col = 4 , lwd = 3)
+lines(time.steps, h.weibull.t(time.steps, weibull.model.manual$par, 1, median(actg$cd4[actg$cd4 > 100 & actg$tx == 1]), step.size), col = 5, lwd = 3)
 legend(legend = c("cd4: 0-100, tx: 0", "cd4: 100+, tx: 0", "cd4: 0-100, tx: 1", "cd4: 100+, tx: 1"), lty = 1, "topleft", col = 2:5, lwd = 4)
 
 plot(survival.functions, conf.int = T, col = 2:5, ylim = c(1,0.7), lwd = 1, main = "Weibull Regression Models and Kaplan Meier Survival Curves")
