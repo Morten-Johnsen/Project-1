@@ -7,6 +7,7 @@ output:
   html_document:
     df_print: paged
 ---
+
 ```{r, include = F}
 knitr::opts_chunk$set(warning = F, fig.height = 4, message = F, dpi = 500)
 rm(list = ls())
@@ -48,14 +49,11 @@ log.data <- read.table("Logistic.txt", header=TRUE, sep="",
 source("testDistribution.R")
 ```
 
-### Fit a logistic regression model for the binary outcome AIDS=”yes” versus AIDS=”no” with the explanatory variable treatment with AZT (Yes, NO). Present the odds ratio for the effect of AZT on AIDS with 95% confidence interval and interpret the result in words
+### Fit a logistic regression model for the binary outcome AIDS="yes" versus AIDS="no" with the explanatory variable treatment with AZT (Yes, NO). Present the odds ratio for the effect of AZT on AIDS with 95% confidence interval and interpret the result in words
 
-The logistic regression model is given by the likelihood function:
-$$
+The logistic regression model is given by the likelihood function: $$
 L(\theta) = \prod_i \left( \dfrac{\theta_i}{1-\theta_i} \right)^{y_i}(1-\theta_i)
-$$
-Here $\theta$ is calculated as:
-$$
+$$ Here $\theta$ is calculated as: $$
 \theta_i = \dfrac{e^{\beta_0 + \beta_1 t_{AZT}}}{1 + e^{\beta_0 + \beta_1 t_{AZT}}}
 $$
 
@@ -78,7 +76,6 @@ beta0 <- log.reg$par[1]
 beta1 <- log.reg$par[2]
 ```
 
-
 ```{r}
 logistic <- data.frame("AZT" = c(rep(1,170), rep(0,168))
                        ,"AIDS_yes" = c(rep(c(1,0),c(25,170-25)), rep(c(1,0), c(44, 168-44))))
@@ -90,8 +87,8 @@ print(cat(paste0("with glm model: ", coef(fit.glm)
 
 ```
 
+Calculate 95% wald confidence interval for $\beta_1$ and subsequently for the odds ratio. Hereafter we justify the use of the Wald CI by examining whether the score function show linearity around the MLE (p. ).
 
-Calculate 95\% wald confidence interval for $\beta_1$ and subsequently for the odds ratio. Hereafter we justify the use of the Wald CI by examining whether the score function show linearity around the MLE (p. ).
 ```{r}
 sd <- sqrt(diag(solve(hessian(func = nll.log, x = c(beta0, beta1), event = log.data$AIDS_yes, n = log.data$n, treatment = c(1,0)))))
 sd.beta0 <- sd[1]
@@ -101,7 +98,11 @@ beta0.wald.CI <- beta0 + c(-1,1)*dnorm(0.975)*sd.beta0
 beta1.wald.CI <- beta1 + c(-1,1)*dnorm(0.975)*sd.beta1
 
 #Test regularity
-score.nll.log <- function(theta, event, n, treatment){
+score.nll.log <- function(theta){
+  
+  event <- log.data$AIDS_yes
+  n <- log.data$n
+  treatment <- c(1,0)
   
   beta0 <- theta[1]
   beta1 <- theta[2]
@@ -116,40 +117,40 @@ score.nll.log <- function(theta, event, n, treatment){
 beta0.test.range <- seq(beta0.wald.CI[1], beta0.wald.CI[2], abs(0.01*beta0))
 beta1.test.range <- seq(beta1.wald.CI[1], beta1.wald.CI[2], abs(0.01*beta1))
 
-res0 <- apply(cbind(beta0.test.range, beta1), MARGIN = 1, FUN = score.nll.log, event = log.data$AIDS_yes, n = log.data$n, treatment = c(1,0))
+res0 <- apply(cbind(beta0.test.range, beta1), MARGIN = 1, FUN = score.nll.log)
 
-res1 <- apply(cbind(beta0, beta1.test.range), MARGIN = 1, FUN = score.nll.log, event = log.data$AIDS_yes, n = log.data$n, treatment = c(1,0))
+res1 <- apply(cbind(beta0, beta1.test.range), MARGIN = 1, FUN = score.nll.log)
 
 par(mfrow = c(1,2))
-plot(beta0.test.range, res0, main = "Score linearity for beta0"
-     ,xlab = "beta0", ylab = "Score", pch = 16)
+plot(beta0.test.range, res0, main = TeX("Score linearity for $\\beta_0$")
+     ,xlab = TeX("$\\beta_0$"), ylab = "Score", pch = 16)
 abline(lm(res0 ~ beta0.test.range), col = 2, lwd = 2)
 grid()
 
-plot(beta1.test.range, res1, main = "Score linearity for beta1"
-     ,xlab = "beta1", ylab = "Score", pch = 16)
+plot(beta1.test.range, res1, main = TeX("Score linearity for $\\beta_1$")
+     ,xlab = TeX("$\\beta_1$"), ylab = "Score", pch = 16)
 abline(lm(res1 ~ beta1.test.range), col = 2, lwd = 2)
 grid()
 
 ```
 
-
 Odds ratio = $exp(\beta_1)$ = `r exp(beta1)`, 95% CI [`r exp(c(beta1.wald.CI[1], beta1.wald.CI[2]))`]. Thus for the individuals receiving the AZT treatment, the odds of developing AIDS or dying is reduced by a factor 0.486 95% CI [0.45, 0.52].
+
 ```{r, include = F}
 exp(beta1)
 exp(c(beta1.wald.CI[1], beta1.wald.CI[2]))
 ```
 
-
 ### Test the hypothesis of no effect of AZT on AIDS using:
 
-* The likelihood ratio test
-* The Wald test
-* The score test
+-   The likelihood ratio test
+-   The Wald test
+-   The score test
 
 #### Likelihood ratio test
 
 Calculate the objective value based on no treatment effect:
+
 ```{r}
 nll.log.no.effect <- function(theta, event, n, treatment){
   
@@ -165,45 +166,43 @@ log.reg.no.effect <- nlminb(start = 1, objective = nll.log.no.effect
                         , event = sum(log.data$AIDS_yes)
                         , n = sum(log.data$n), treatment = 0)
 ```
+
 Run the LRT (assuming regularity of the likelihoods (*page 36*)):
+
 ```{r}
-(chi.squared <- - 2 * (log.reg$objective - log.reg.no.effect$objective))
-(p.value <- 1 - pchisq(chi.squared, df = 1))
+chi.squared <- - 2 * (log.reg$objective - log.reg.no.effect$objective)
+p.value <- 1 - pchisq(chi.squared, df = 1)
+
+cat("The log ratio chi-square test statistic = ",chi.squared,
+    "\np-value = ", p.value,
+    "\n\nThe log-ratio test show that the effect of the treatment is significant on a significance level of alpha = 0.05.")
 ```
 
 #### Wald test statistic
 
-Calculating the wald test statistic (*p. 156*, or *p. 42 with $\theta_0 = 0$*).
+Calculating the wald test statistic (*p. 156*, or *p. 42 with* $\theta_0 = 0$).
+
 ```{r}
-(waldTestStatistic <- beta1/sd.beta1)
-(wald.p.value <- 2*pnorm(waldTestStatistic))
+waldTestStatistic <- beta1/sd.beta1
+wald.p.value <- 2*pnorm(waldTestStatistic)
+
+cat("The wald test statistic = ",waldTestStatistic,
+    "\np-value = ", wald.p.value,
+    "\n\nThe wald test show that the effect of the treatment is significant on a significance level of alpha = 0.05.")
 ```
 
 #### The score test
 
-Calculating the score function for the logistic regression model.
+Calculating the score function for the logistic regression model. 
 $$
 S(\theta) = \dfrac{1}{\theta} \sum_i y_i + \dfrac{1}{1+\theta} \sum_i 1-y_i
-$$
+$$\
+
 ```{r}
 #ikke færdig
-scoreFunction <- function(theta){
-  beta0 <- theta[1]
-  beta1 <- theta[2]
-  event <- log.data$AIDS_yes
-  n <- log.data$n
-  treatment <- c(1,0)
-  
-  theta <- exp(beta0 + beta1 * treatment)/(1 + exp(beta0 + beta1 * treatment))
-  
-  score <- -sum(1/theta * event + 1/(1 + theta) * (n - event))
-  return(score)
-}
 
-scoreFunction(log.reg$par) * hessian(func = scoreFunction, x = log.reg$par)
-scoreFunction(log.reg$par)
+score.nll.log(log.reg$par) / sqrt(solve(hessian(func = score.nll.log, x = log.reg$par)))
 ```
-
 
 ## Analysis of the survival time data
 
@@ -212,6 +211,7 @@ scoreFunction(log.reg$par)
 #### Read the data actg320.txt into R
 
 Read in the data:
+
 ```{r}
 #tx: Treatment indicator. 1 = New treatment, 0 = Control treatment
 #event: Indicator for AIDS or death. 1 = AIDS diagnosis or death, 0 = Otherwise
@@ -225,7 +225,6 @@ actg <- actg320 %>%
   dplyr::select(time, event, tx, cd4)
 ```
 
-
 #### How many patients got AIDS or died in the two treatment groups? And how long was the total follow-up time in the two groups?
 
 ```{r}
@@ -236,7 +235,6 @@ actg %>%
             "Participants Given the Treatment" = n(),
             "Total follow up time" = sum(time))
 ```
-
 
 #### Plot the survival functions in the two treatment groups, which group seems to be doing best?
 
@@ -252,7 +250,6 @@ ggsurvplot(kaplan.meier
                    ,ggtheme = theme_bw()
                    ,legend.labs = c("No Treatment", "Treatment"))
 ```
-
 
 #### Plot the cumulative incidence functions for the two groups, which plot would you prefer?
 
@@ -274,13 +271,14 @@ See slides 31-33 from week 6 for calculations by hand.
 ```{r}
 survdiff(Surv(time, event) ~ tx, data = actg)
 ```
+
 p-value of 0.001, thus there is a significant difference between the two treatment groups based on a significance level of 0.05.
 
 ### Parametric survival models
 
 #### Fit parametric survival models containing treatment (tx) and CD4 count (cd4) as explanatory variables
 
-* Try using the exponential, Weibull and log-logistic models, which one gave the best fit (and why)?   
+-   Try using the exponential, Weibull and log-logistic models, which one gave the best fit (and why)?
 
 ```{r}
 exp.model <- survreg(Surv(time, event) ~ tx + cd4, data = actg, dist = "exponential")
@@ -311,10 +309,10 @@ sd.exp.manual <- sqrt(diag(solve(hessian(func = nll.exp, x = exp.model.manual$pa
 exp.model.manual.AIC <- - 2 * exp.model.manual$objective - 2 * 3
 
 ```
+
 ##### Weibull model
 
-Use:
-slide 10 for f(t), S(t), h(t) and H(t) relationships, slide 19 for general log-likelihood expression for censored data, slide 55 for S(t) and *z*, slide 60 for h(t).
+Use: slide 10 for f(t), S(t), h(t) and H(t) relationships, slide 19 for general log-likelihood expression for censored data, slide 55 for S(t) and *z*, slide 60 for h(t).
 
 ```{r}
 summary(weibull.model)
@@ -339,7 +337,7 @@ weibull.model.manual <- nlminb(start = c(1,1,1,1), objective = nll.wei)
 sd.weibull.manual <- sqrt(diag(solve(hessian(func = nll.wei, x = weibull.model.manual$par))))
 weibull.model.manual.AIC <- 2 * weibull.model.manual$objective + 2 * length(weibull.model.manual$par) #3 parms + scale
 ```
- 
+
 ```{r}
 summary(loglogistic.model)
 
@@ -408,13 +406,17 @@ plot(fit.loglog$time, -log(fit.loglog$surv), main = "Log-logistic Cox-Snell Chec
 grid()
 abline(a=0, b=1, col = 2, lwd = 2)
 ```
+
 Weibull and log-logistic seem quite similar. For both we still see a heavy tail, which is not accounted for in the model.
 
 Use AIC to compare the models (exp excluded due to poor cox-snell fit):
+
 ```{r}
 cat("Weibull Regression Model AIC: ", weibull.model.manual.AIC,
     "\nLog-logistic Regression Model AIC: ", loglogistic.model.manual.AIC)
 ```
+
+*Here, the loglog model has the lower AIC, however we stick to the Weibull regression model as both these models have scale > 1, and thus show that the survival curve behaviour is monotonously decrease, and as such the loglog model has no modelwise advantage as compared to the weibull model. (Dobbelttjek dette)*
 
 #### Using the survival model you chose, make a table of estimates and their 95% confidence intervals
 
@@ -429,26 +431,89 @@ cat("beta_0 = ", weibull.model.manual$par[2], "95% CI [",weibull.lower[2],", ",w
 ```
 
 Table format:
+
 ```{r}
 tibble("parameter" = c("beta_0", "beta_1", "beta_2", "sigma")
        , "theta hat" = c(weibull.model.manual$par[2:4], exp(weibull.model.manual$par[1]))
        , "lower CI (2.5%)" = c(weibull.lower[2:4], exp(weibull.lower[1]))
        , "upper CI (97.5%)" = c(weibull.upper[2:4], exp(weibull.upper[1])))
 ```
+
 $\theta$ does not span 1, and thus the estimated weibull distribution is significantly different from simply using an exponential distribution.
+
+Double-check whether the regularity assumption which is necessary for the use of Wald confidence intervals is appropriate, by examining the linearity of the score function at the MLE estimates:
+
+```{r, include = F}
+# score.nll.wei <- function(theta){
+#   time = actg$time
+#   event = actg$event
+#   treatment = actg$tx
+#   cd4 = actg$cd4
+#   sigma <- exp(theta[1])  #estimate scale parameter on log-scale
+#   beta0 <- theta[2]
+#   beta1 <- theta[3]
+#   beta2 <- theta[4]
+#   
+#   theta <- (beta0 + beta1 * treatment + beta2 * cd4)
+#   
+#   #score <- -sum(-event/sigma + time^(1/sigma)*exp(-theta/sigma)/sigma)
+#   score <- -sum((-event + (time/theta)^(1/sigma))/(sigma*theta))
+#   return(score)
+# }
+# 
+# beta0 <- weibull.model.manual$par[2]
+# beta1 <- weibull.model.manual$par[3]
+# beta2 <- weibull.model.manual$par[4]
+# sigma <- exp(weibull.model.manual$par[1])
+# 
+# beta0.wald.CI <- c(weibull.lower[2], weibull.upper[2])
+# beta1.wald.CI <- c(weibull.lower[3], weibull.upper[3])
+# beta2.wald.CI <- c(weibull.lower[4], weibull.upper[4])
+# sigma.wald.CI <- exp(c(weibull.lower[1], weibull.upper[1]))
+# 
+# beta0.test.range <- seq(beta0.wald.CI[1], beta0.wald.CI[2], abs(0.01*beta0))
+# beta1.test.range <- seq(beta1.wald.CI[1], beta1.wald.CI[2], abs(0.01*beta1))
+# beta2.test.range <- seq(beta2.wald.CI[1], beta2.wald.CI[2], abs(0.01*beta2))
+# 
+# res0 <- apply(cbind(sigma, beta0.test.range, beta1, beta2), MARGIN = 1, FUN = score.nll.wei)
+# 
+# res1 <- apply(cbind(sigma, beta0, beta1.test.range, beta2), MARGIN = 1, FUN = score.nll.wei)
+# 
+# res2 <- apply(cbind(sigma, beta0, beta1, beta2.test.range), MARGIN = 1, FUN = score.nll.wei)
+# 
+# par(mfrow = c(1,3))
+# plot(beta0.test.range, res0, main = TeX("Score linearity for $\\beta_0$")
+#      ,xlab = TeX("$\\beta_0$"), ylab = "Score", pch = 16)
+# abline(lm(res0 ~ beta0.test.range), col = 2, lwd = 2)
+# grid()
+# 
+# plot(beta1.test.range, res1, main = TeX("Score linearity for $\\beta_1$")
+#      ,xlab = TeX("$\\beta_1$"), ylab = "Score", pch = 16)
+# abline(lm(res1 ~ beta1.test.range), col = 2, lwd = 2)
+# grid()
+# 
+# plot(beta1.test.range, res1, main = TeX("Score linearity for $\\beta_2$")
+#      ,xlab = TeX("$\\beta_2$"), ylab = "Score", pch = 16)
+# abline(lm(res1 ~ beta1.test.range), col = 2, lwd = 2)
+# grid()
+
+```
+
 
 #### Using your model compute the time ratio for the treatment effect. Similarly, compute the time ratio for the effect of increasing the CD4 count with 50. In both cases unceartainty evaluation (e.g. confidence intervals) should be included. Interpret the results in words
 
 For the treatment effect:
+
 ```{r}
 beta1 <- weibull.model.manual$par[3]
 
 cat("Time Ratio for the treatment effect: TR(tx = 1, tx = 0) = ", exp(beta1), " 95% CI [",exp(c(weibull.lower[3])),",", exp(c(weibull.upper[3])),"]")
 ```
+
 Based on this calculation of the time ratio of the treatment effect, it is evident that the treatment increase the median survival time by a factor 2.32 95% CI [1.32; 4.06].
 
-
 For increasing the cd4 count by 50:
+
 ```{r}
 beta2 <- weibull.model.manual$par[4]
 
@@ -456,7 +521,6 @@ cat("Time Ratio for the treatment effect: TR(tx = 1, tx = 0) = ", exp(beta2*50),
 ```
 
 Here we see that by increasing the cd4 count by 50, the median survival time is increased by a factor 2.8 95% CI [1.93,4.07].
-
 
 #### Assess the goodness of fit of this model using a plot based on the Cox Snell residuals
 
@@ -536,5 +600,4 @@ lines(time.steps, third.sim, col = 4 , lwd = 3)
 lines(time.steps, fourth.sim, col = 5, lwd = 3)
 legend(legend = c("cd4: 0-100, tx: 0", "cd4: 100+, tx: 0", "cd4: 0-100, tx: 1", "cd4: 100+, tx: 1"), lty = 1, "bottomleft", col = 2:5, lwd = 4)
 
-```   
-
+```
