@@ -44,3 +44,9 @@ lines(outs$`1`$t, outs$`1`$lower, lty = "dashed")
 lines(outs$`1`$t, outs$`1`$upper, lty = "dashed")
 lines(outs$`0`$t, outs$`0`$lower, lty = "dashed")
 lines(outs$`0`$t, outs$`0`$upper, lty = "dashed")
+
+
+library(survival)
+fit <- survfit(Surv(time, event) ~ tx, data = actg)
+fit$surv
+fit$time
