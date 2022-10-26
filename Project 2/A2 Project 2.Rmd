@@ -90,13 +90,47 @@ print(cat(paste0("with glm model: ", coef(fit.glm)
 
 ```
 
-Calculating 95\% wald confidence interval for $\beta_1$ and subsequently for the odds ratio.
+
+Calculate 95\% wald confidence interval for $\beta_1$ and subsequently for the odds ratio. Hereafter we justify the use of the Wald CI by examining whether the score function show linearity around the MLE (p. ).
 ```{r}
 sd <- sqrt(diag(solve(hessian(func = nll.log, x = c(beta0, beta1), event = log.data$AIDS_yes, n = log.data$n, treatment = c(1,0)))))
 sd.beta0 <- sd[1]
 sd.beta1 <- sd[2]
 
+beta0.wald.CI <- beta0 + c(-1,1)*dnorm(0.975)*sd.beta0
 beta1.wald.CI <- beta1 + c(-1,1)*dnorm(0.975)*sd.beta1
+
+#Test regularity
+score.nll.log <- function(theta, event, n, treatment){
+  
+  beta0 <- theta[1]
+  beta1 <- theta[2]
+  
+  theta <- exp(beta0 + beta1 * treatment)/(1 + exp(beta0 + beta1 * treatment))
+  
+  score <- -sum(event/theta - (n - event)/(1 - theta))
+  return(score)
+}
+
+
+beta0.test.range <- seq(beta0.wald.CI[1], beta0.wald.CI[2], abs(0.01*beta0))
+beta1.test.range <- seq(beta1.wald.CI[1], beta1.wald.CI[2], abs(0.01*beta1))
+
+res0 <- apply(cbind(beta0.test.range, beta1), MARGIN = 1, FUN = score.nll.log, event = log.data$AIDS_yes, n = log.data$n, treatment = c(1,0))
+
+res1 <- apply(cbind(beta0, beta1.test.range), MARGIN = 1, FUN = score.nll.log, event = log.data$AIDS_yes, n = log.data$n, treatment = c(1,0))
+
+par(mfrow = c(1,2))
+plot(beta0.test.range, res0, main = "Score linearity for beta0"
+     ,xlab = "beta0", ylab = "Score", pch = 16)
+abline(lm(res0 ~ beta0.test.range), col = 2, lwd = 2)
+grid()
+
+plot(beta1.test.range, res1, main = "Score linearity for beta1"
+     ,xlab = "beta1", ylab = "Score", pch = 16)
+abline(lm(res1 ~ beta1.test.range), col = 2, lwd = 2)
+grid()
+
 ```
 
 
