@@ -173,6 +173,47 @@ cat("beta_0 = ", norm.lin.par$par[1], "95% CI [",Wald.CI.lower[1],", ",Wald.CI.u
     ,"\nbeta_2 = ", norm.lin.par$par[3], "95% CI [",Wald.CI.lower[3],", ",Wald.CI.upper[3],"]"
     )
 
+#Test regularity
+score.nll.norm <- function(theta, regr1, regr2, response, sigma){
+
+  beta0 <- theta[1]
+  beta1 <- theta[2]
+  beta2 <- theta[3]
+  n <- length(response)
+  
+  theta <- beta0 + beta1 * regr1 + beta2 * regr2
+  #sigma <- sqrt( 1/length(response) * sum( (response - theta)^2 ) )
+  score <- n/sigma^2 * (mean(response) - theta)#p. 213
+  return(-sum(score))
+}
+
+beta0.test.range <- seq(Wald.CI.lower[1], Wald.CI.upper[1], abs(0.01*norm.lin.par$par[1]))
+beta1.test.range <- seq(Wald.CI.lower[2], Wald.CI.upper[2], abs(0.01*norm.lin.par$par[2]))
+beta2.test.range <- seq(Wald.CI.lower[3], Wald.CI.upper[3], abs(0.01*norm.lin.par$par[3]))
+
+sigma.s <- sqrt( 1/dim(D)[1] * sum ( (D$transformed.pow.obs.norm - ( norm.lin.par$par[1] + norm.lin.par$par[2] * D$ws30 + norm.lin.par$par[3] * D$ws30^2) )^2 ) )
+
+res0 <- apply(cbind(beta0.test.range, norm.lin.par$par[2], norm.lin.par$par[3]), MARGIN = 1, FUN = score.nll.norm, regr1 = D$ws30, regr2 = D$ws30^2, response = D$transformed.pow.obs.norm, sigma = sigma.s)
+
+res1 <- apply(cbind(norm.lin.par$par[1], beta1.test.range, norm.lin.par$par[3]), MARGIN = 1, FUN = score.nll.norm, regr1 = D$ws30, regr2 = D$ws30^2, response = D$transformed.pow.obs.norm, sigma = sigma.s)
+
+res2 <- apply(cbind(norm.lin.par$par[1], norm.lin.par$par[2], beta2.test.range), MARGIN = 1, FUN = score.nll.norm, regr1 = D$ws30, regr2 = D$ws30^2, response = D$transformed.pow.obs.norm, sigma = sigma.s)
+
+par(mfrow = c(1,3))
+plot(beta0.test.range, res0, main = "Score linearity for beta0"
+     ,xlab = "beta0", ylab = "Score", pch = 16)
+abline(lm(res0 ~ beta0.test.range), col = 2, lwd = 2)
+grid()
+
+plot(beta1.test.range, res1, main = "Score linearity for beta1"
+     ,xlab = "beta1", ylab = "Score", pch = 16)
+abline(lm(res1 ~ beta1.test.range), col = 2, lwd = 2)
+grid()
+
+plot(beta2.test.range, res2, main = "Score linearity for beta2"
+     ,xlab = "beta2", ylab = "Score", pch = 16)
+abline(lm(res2 ~ beta2.test.range), col = 2, lwd = 2)
+grid()
 
 ```
 
