@@ -9,6 +9,7 @@ Setting working directories and loading the data. Data is also normalized.
 
 ```{r}
 library(ggplot2)
+library(numDeriv)
 
 if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
   setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
@@ -92,25 +93,30 @@ transfit1 <- lm( (D$transformed.pow.obs.norm ~ ws30), data = D ) #good for compa
 transfit12 <- lm( (D$transformed.pow.obs.norm ~ ws30 + I(ws30^2)), data = D) #brilliant
 transfit2 <- lm( (D$transformed.pow.obs.norm ~ I(ws30^2)), data = D ) #1. jeg har ladt disse to stå for at illustrere noget med residualerne
 transfit3 <- lm( (D$transformed.pow.obs.norm ~ I(ws30^3)), data = D ) #2. 
-
+#transfitS <- lm( (D$transformed.pow.obs.norm ~ ws30 + I(ws30^2) + Season), data = D )
 summary(transfit1)
 summary(transfit12)
 
 D$transformed.pred1 <- transfit1$coefficients[1] + transfit1$coefficients[2] * D$ws30
 D$transformed.pred12 <- transfit12$coefficients[1] + transfit12$coefficients[2] * D$ws30 + transfit12$coefficients[3] * D$ws30^2
 
+#D$transformed.predS <- transfitS$coefficients[1] + transfitS$coefficients[2] * D$ws30 + transfitS$coefficients[3] * D$ws30^2 + transfitS$coefficients[4] * D$Season
+#summary(transfitS)
+
 ggplot(data = D)+
   geom_point(aes(x=ws30, y=transformed.pow.obs.norm, colour="Data"))+
   geom_line(aes(x=ws30, y=transformed.pred1, colour="Model1"))+
   geom_line(aes(x=ws30, y=transformed.pred12, colour="Model12"))+
+  #geom_line(aes(x=ws30, y=transformed.predS, colour="ModelS"))+
   labs(x = "Wind speeds", y="Transformed, norm power obs", colour = "")
+
 
 summary(lm( (D$transformed.pow.obs.norm ~ ws30 + I(ws30^2) + wd30), data = D)) #simply a check with the final model to make sure that wd still is irrelevant as regressor
 ```
 
 Tjek af modellerne:
 
-```{r pressure, echo=FALSE}
+```{r pressure, echo=FALSE, fig.height = 8, fig.width = 8}
 par(mfrow=c(2,2))
 plot(D$ws30, transfit1$residuals)
 plot(D$ws30, transfit2$residuals)
@@ -134,5 +140,89 @@ norm.lin.par <- nlminb(c(1,1,1), objective = NLL.norm.lin, regr1 = D$ws30, regr2
 
 round( rbind(transfit12$coefficients,betas[1:3],norm.lin.par$par), digits=6)
 ```
+```{r}
+y_p <- D$transformed.pred12
+#y_pS <- D$transformed.predS
+D$y_inv_trans <- 1/( exp(y_p*lambda)+1 )^(1/lambda) * exp(y_p)
+#D$Season_inv_trans <- 1/( exp(y_pS*lambda)+1 )^(1/lambda) * exp(y_pS)
 
+#D$Season <- 0
+#D$Season[D$month > 5] <- 1
+
+ggplot(data = D)+
+  geom_point(aes(x=ws30, y=pow.obs.norm))+
+  geom_line(aes(x=ws30, y=y_inv_trans, colour="Inv"))+
+  #geom_line(aes(x=ws30, y=Season_inv_trans, colour="InvS"))+
+  labs(x = "Wind speeds", y="Norm power obs", colour = "")+
+  theme_bw()
+  #scale_shape_manual(values = c(1:10))+
+  #scale_colour_manual(values = c("blue", "yellow", "black"))
+
+plot(D$ws30, D$pow.obs.norm-D$y_inv_trans)
+abline(h=0)
+
+```
+Uncertainties of parameters (in transformed domain)
+```{r}
+norm.lin.sds <- sqrt(diag(solve(hessian( func = NLL.norm.lin, x = norm.lin.par$par, regr1 = D$ws30, regr2 = D$ws30^2, response = D$transformed.pow.obs.norm ))))
+Wald.CI.upper <- norm.lin.par$par + qnorm(0.975) * norm.lin.sds
+Wald.CI.lower <- norm.lin.par$par - qnorm(0.975) * norm.lin.sds
+
+cat("beta_0 = ", norm.lin.par$par[1], "95% CI [",Wald.CI.lower[1],", ",Wald.CI.upper[1],"]"
+    ,"\nbeta_1 = ", norm.lin.par$par[2], "95% CI [",Wald.CI.lower[2],", ",Wald.CI.upper[2],"]"
+    ,"\nbeta_2 = ", norm.lin.par$par[3], "95% CI [",Wald.CI.lower[3],", ",Wald.CI.upper[3],"]"
+    )
+
+#Test regularity
+score.nll.norm <- function(theta, regr1, regr2, response, sigma){
+
+  beta0 <- theta[1]
+  beta1 <- theta[2]
+  beta2 <- theta[3]
+  n <- length(response)
+  
+  theta <- beta0 + beta1 * regr1 + beta2 * regr2
+  #sigma <- sqrt( 1/length(response) * sum( (response - theta)^2 ) )
+  score <- n/sigma^2 * (mean(response) - theta)#p. 213
+  return(-sum(score))
+}
+
+beta0.test.range <- seq(Wald.CI.lower[1], Wald.CI.upper[1], abs(0.01*norm.lin.par$par[1]))
+beta1.test.range <- seq(Wald.CI.lower[2], Wald.CI.upper[2], abs(0.01*norm.lin.par$par[2]))
+beta2.test.range <- seq(Wald.CI.lower[3], Wald.CI.upper[3], abs(0.01*norm.lin.par$par[3]))
+
+sigma.s <- sqrt( 1/dim(D)[1] * sum ( (D$transformed.pow.obs.norm - ( norm.lin.par$par[1] + norm.lin.par$par[2] * D$ws30 + norm.lin.par$par[3] * D$ws30^2) )^2 ) )
+
+res0 <- apply(cbind(beta0.test.range, norm.lin.par$par[2], norm.lin.par$par[3]), MARGIN = 1, FUN = score.nll.norm, regr1 = D$ws30, regr2 = D$ws30^2, response = D$transformed.pow.obs.norm, sigma = sigma.s)
+
+res1 <- apply(cbind(norm.lin.par$par[1], beta1.test.range, norm.lin.par$par[3]), MARGIN = 1, FUN = score.nll.norm, regr1 = D$ws30, regr2 = D$ws30^2, response = D$transformed.pow.obs.norm, sigma = sigma.s)
+
+res2 <- apply(cbind(norm.lin.par$par[1], norm.lin.par$par[2], beta2.test.range), MARGIN = 1, FUN = score.nll.norm, regr1 = D$ws30, regr2 = D$ws30^2, response = D$transformed.pow.obs.norm, sigma = sigma.s)
+
+par(mfrow = c(1,3))
+plot(beta0.test.range, res0, main = "Score linearity for beta0"
+     ,xlab = "beta0", ylab = "Score", pch = 16)
+abline(lm(res0 ~ beta0.test.range), col = 2, lwd = 2)
+grid()
+
+plot(beta1.test.range, res1, main = "Score linearity for beta1"
+     ,xlab = "beta1", ylab = "Score", pch = 16)
+abline(lm(res1 ~ beta1.test.range), col = 2, lwd = 2)
+grid()
+
+plot(beta2.test.range, res2, main = "Score linearity for beta2"
+     ,xlab = "beta2", ylab = "Score", pch = 16)
+abline(lm(res2 ~ beta2.test.range), col = 2, lwd = 2)
+grid()
+
+```
+
+Interpretation of parameters 
+```{r}
+transfit12$coefficients
+beta_0 <- transfit12$coefficients[1]
+( offset_inv <- 1/( exp(beta_0*lambda)+1 )^(1/lambda) * exp(beta_0) )
+```
+The regression model used is a normal model with data transformation. The first parameter is the intercept with the y-axis and can be transformed back to the original domain yielding an offset value of 0.00035. This is as expected since there should be no power production at 0 wind speed.
+The other two parameters are slope coefficients. The first is positive and describes the relationship between the wind speed and the power production. According to this model it should increase linearly (in the transformed domain). The second coefficient is negative and implies a negative proportionality to the square of the wind speed (in the transformed domain).
 

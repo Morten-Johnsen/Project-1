@@ -457,8 +457,8 @@ ggplot(compare.table.treatment,aes(x = `weibull cumhaz tx`, y = `KM cumhaz tx`))
 ```{r}
 #Likelihood Ratio Test (LRT) comparison
 #one model:
-chi_squared <- - 2 * ((t1$objective + t0$objective) - both$objective)
-(p_value <- 1 - pchisq(chi_squared, df = 1))
+##chi_squared <- - 2 * ((t1$objective + t0$objective) - both$objective)
+##(p_value <- 1 - pchisq(chi_squared, df = 1))
 #no difference as p_value: 0.46 > 0.05.
 ```
 
@@ -468,11 +468,11 @@ From the above calculation of the p-value = `{r} p_value`, we see that there's -
 Below can be seen a QQ-plot of the model, which also clearly shows that the model is unable to capture the underlying distribution of the data.
 
 ```{r}
-theoretical <- quantile(x = actg_event$time, probs = pexp(q = actg_event$time, rate = both$par))
-plot(theoretical, actg_event$time, main = "QQplot", xlab = "Theoretical Quantiles"
-     ,ylab = "Sample Quantiles")
-grid()
-abline(lm(actg_event$time ~ theoretical))
+# theoretical <- quantile(x = actg_event$time, probs = pexp(q = actg_event$time, rate = both$par))
+# plot(theoretical, actg_event$time, main = "QQplot", xlab = "Theoretical Quantiles"
+#      ,ylab = "Sample Quantiles")
+# grid()
+# abline(lm(actg_event$time ~ theoretical))
 ```
 
 
