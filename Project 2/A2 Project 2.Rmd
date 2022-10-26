@@ -303,7 +303,7 @@ nll.wei <- function(theta
 
 weibull.model.manual <- nlminb(start = c(1,1,1,1), objective = nll.wei)
 sd.weibull.manual <- sqrt(diag(solve(hessian(func = nll.wei, x = weibull.model.manual$par))))
-weibull.model.manual.AIC <- - 2 * weibull.model.manual$objective + 2 * length(weibull.model.manual$par) #3 parms + scale
+weibull.model.manual.AIC <- 2 * weibull.model.manual$objective + 2 * length(weibull.model.manual$par) #3 parms + scale
 ```
  
 ```{r}
@@ -331,7 +331,7 @@ nll.loglog <- function(theta
 
 loglogistic.model.manual <- nlminb(start = c(1,1,1,1), objective = nll.loglog)
 sd.loglogistic.manual <- sqrt(diag(solve(hessian(func = nll.loglog, x = loglogistic.model.manual$par))))
-loglogistic.model.manual.AIC <- - 2 * loglogistic.model.manual$objective + 2 * length(loglogistic.model.manual$par) #3 parms + scale
+loglogistic.model.manual.AIC <- 2 * loglogistic.model.manual$objective + 2 * length(loglogistic.model.manual$par) #3 parms + scale
 ```
 
 Examining the fits of the models through the cox-snell residuals
@@ -440,7 +440,7 @@ abline(a=0, b=1, col = 2, lwd = 2)
 
 #### Give a graphical presentation of your model
 
-```{r, fig.width = 16}
+```{r, fig.width = 8}
 actg$cd4.cats <- cut(actg$cd4, breaks = c(0,100,max(actg$cd4)))
 survival.functions <- survfit(Surv(time, event) ~ tx + cd4.cats, data = actg)
 

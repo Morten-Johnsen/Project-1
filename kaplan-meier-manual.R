@@ -25,12 +25,6 @@ kaplan.meier <- function(data = WHAS, event = 'fstat', time = 'lenfol'){
     select(-loglog_minus, -loglog_plus, -logS, -Varloglog, -EventsPerAvailable)-> init.table
   return(init.table)
 }
-kaplan.meier()
-
-test.data <- data.frame("Subject" = c(1,2,3,4,5), "Time" = c(6,21,14,62,44), "Dead" = c(1,0,1,1,1))
-
-kaplan.meier(data = test.data, event = "Dead", time = "Time")
-
 
 # Old: 
 # WHAS %>% 
