@@ -283,8 +283,8 @@ From these figures it can be concluded that the quadratic approximation of the C
 The Wald and likelihood-based confidence intervals for the two $\beta_i, i\in (0,1)$ parameters can be seen printed below.
 
 ```{r}
-sd_0 <- as.numeric(sqrt(solve(hessian(beta_0, func = nll.p_0))))
-sd_1 <- as.numeric(sqrt(solve(hessian(beta_1, func = nll.p_1, beta_0 = beta_0))))
+sd_0 <- as.numeric(sqrt(diag(solve(hessian(beta_0, func = nll.p_0)))))
+sd_1 <- as.numeric(sqrt(diag(solve(hessian(beta_1, func = nll.p_1, beta_0 = beta_0)))))
 
 #Wald 95% CIs and profile-likelihoods with approx 95% CI
 W.CI.0 <- round(beta_0 + c(-1,1)*qnorm(0.975)*sd_0,4)
@@ -374,34 +374,43 @@ actg %>%
 Fitting an exponential model, where we account for censoring:
 ```{r}
 #page 310 in the course textbook
-theta.hat.both <- sum(actg$time)/sum(actg$event)
 ```
 
 Theta for each group individually:
 ```{r}
 #With treatment: (p. 311)
 actg_tx <- filter(actg, tx == 1)
-theta.hat.tx <- sum(actg_tx$time)/sum(actg_tx$event)
-sigma.hat.tx <- theta.hat.tx/sum(actg$event)^(1/2)
-
-#without treatment:
 actg_no_tx = filter(actg, tx == 0)
-theta.hat.no.tx <- sum(actg_no_tx$time)/sum(actg_no_tx$event)
-sigma.hat.no.tx <- theta.hat.tx/sum(actg$event)^(1/2)
-
-#Wald statistic for comparison
-(theta.hat.tx - theta.hat.no.tx)/sqrt(sigma.hat.tx^2 + sigma.hat.no.tx^2)
 #this is larger than 2 and thus statistically significant (skal der sammenlignes med t-dist eller chi_squared?)
 ```
-
+What we did the first time around was actaully using the analytical derivations and then using these to do the tests. I have commented the actual numerical analysis but have left the first results uncommented in order not to mess with the code. See exp.nll just below for "analytical optimization" and exp.ll.NUM for numerical optimization.
 
 ```{r}
-exp.nll <- function(theta, time = actg$time, event = actg$event){
+exp.nll <- function(theta, time = actg$time, event = actg$event){ #this isn't numerical? KOMMENTAR
   nll <- -(sum(event)*log(1/theta) - sum(time/theta))
   return(nll)
 }
+exp.nll.NUM <- function(theta, time = actg$time, event = actg$event){ #this is 8D
+  ll <- sum( dexp(time[event==1], 1/theta, log = T) ) + sum( pexp(time[event==0], 1/theta, lower.tail = F, log.p = T) )
+  return(-ll) 
+}
 
 est <- nlminb(start = 1, objective = exp.nll)
+est.NUM <- nlminb(start = 1, objective = exp.nll.NUM)
+est.tx <- nlminb(start = 1, objective = exp.nll, time = actg_tx$time, event = actg_tx$event)
+est.tx.NUM <- nlminb(start = 1, objective = exp.nll.NUM, time = actg_tx$time, event = actg_tx$event)
+est.no.tx <- nlminb(start = 1, objective = exp.nll, time =actg_no_tx$time, event = actg_no_tx$event)
+est.no.tx.NUM <- nlminb(start = 1, objective = exp.nll.NUM, time = actg_no_tx$time, event = actg_no_tx$event)
+
+sd.NUM <- as.numeric(sqrt(diag(solve( hessian(exp.nll.NUM, est.NUM$par )))))
+sd.tx.NUM <- as.numeric(sqrt(diag(solve( hessian(exp.nll.NUM, est.tx.NUM$par, time = actg_tx$time, event = actg_tx$event) ))))
+sd.no.tx.NUM <- as.numeric(sqrt(diag(solve( hessian(exp.nll.NUM, est.no.tx.NUM$par, time = actg_no_tx$time, event = actg_no_tx$event) ))))
+
+(est.tx.NUM$par - est.no.tx.NUM$par)/sqrt(sd.tx.NUM^2 + sd.no.tx.NUM^2) #311, compared to standard norm (z). the effect is significant :)
+
+theta.hat.both <- est.NUM$par#to avoid having to alter all names
+theta.hat.tx <- est.tx.NUM$par
+theta.hat.no.tx <- est.no.tx.NUM$par
 
 #weibull
 wei.nll <- function(omega, time = actg$time, event = actg$event){
@@ -455,26 +464,8 @@ ggplot(compare.table.treatment,aes(x = `weibull cumhaz tx`, y = `KM cumhaz tx`))
 #### Compared the likelihood for the above models and conclude
 
 ```{r}
-#Likelihood Ratio Test (LRT) comparison
-#one model:
-##chi_squared <- - 2 * ((t1$objective + t0$objective) - both$objective)
-##(p_value <- 1 - pchisq(chi_squared, df = 1))
-#no difference as p_value: 0.46 > 0.05.
+#numerical analysis above, analytical way below
 ```
-
-From the above calculation of the p-value = `{r} p_value`, we see that there's - according to this model - no significant difference is achieved by using the treatment. However, this model is flawed, as it does not account for all the censored datapoints. This will be addressed in the coming analysis, where we use the kaplan meier survival analysis.
-
-
-Below can be seen a QQ-plot of the model, which also clearly shows that the model is unable to capture the underlying distribution of the data.
-
-```{r}
-# theoretical <- quantile(x = actg_event$time, probs = pexp(q = actg_event$time, rate = both$par))
-# plot(theoretical, actg_event$time, main = "QQplot", xlab = "Theoretical Quantiles"
-#      ,ylab = "Sample Quantiles")
-# grid()
-# abline(lm(actg_event$time ~ theoretical))
-```
-
 
 #### Formulate a model where one parameter indicate the treatment effect, find the MLE and compare with the result above.
 
@@ -504,8 +495,7 @@ confint(fit)
 #beta1 = 0.699 85% CI [0.28; 1.12]
 # => Significant difference.
 
-#ifølge ovenstående er der statistisk signifikant forskel. Herunder regnes i hånden i stedet, så
-#vi ved hvad der foregår.
+#ifølge oven- og nedenstående er der statistisk signifikant forskel.
 ```
 
 Are the effect of the treatment statistically significant?
@@ -513,7 +503,7 @@ Are the effect of the treatment statistically significant?
 surv_diff <- survdiff(Surv(time, event) ~ tx, data = actg)
 surv_diff
 ```
-Yes it is.
+Yes it is significant.
 
 
 Same calculations but now performed by hand:
@@ -646,6 +636,151 @@ confint(fit);round(Wald.CI_former, digits=2)#KOMMENTAR: se her sammenligningen o
 Same as the wald CI. The likelihood based CI is a bit more narrow.
 
 #### Derive the theoretical results for the models above, including the standard error estimates, use this to formulate and implement the profile likelihood function for the treatment parameter.
+Theoretical results for the models of the exponential distributions. BULLET POINT 3-4.
+Probabilities can be considered the probability of some data given a distribution, however, with likelihoods we want to estimate the distribution given some data. This is done by comparing the probability of observing the data given different $\theta s$. As a function of the unknown parameter the becomes:
+$$
+L(\theta)=P_{\theta}(X=x)
+$$
+<!-- p.21 was a great inspiration #KOMMENTAR, stort P eller lille p? jeg bruger ellers lille p for pdf og stort P for cdf -->
+
+Where naturally x is the data, and $P_{\theta}$ is the pdf with parameter $\theta$. 
+Usually when we work with likelihoods we simply consider all of the observations to be independent such that we can calculate the likelihood as a product of the probabilites of each observation in data = x given the same distribution $p_{\theta}$. So if X is a vector of *n* observations and $x_i$ respresents one observation the likelihood is:
+$$
+L(\theta)=\Pi_{i=1}^n p_{\theta}(x_i)
+$$
+<!-- maybe p. 27 xD -->
+This brings us to how we are to interpret the uncensored and censored values. The probability of any time value that is uncensored can simply be calculated as the probability of said time given event rate $\lambda = 1/\theta$ assuming an exponential distribution.
+$$
+L(\theta)_{uncensored}=p_{\theta,exp}(x_i)=\frac{1}{\theta} e^{-\frac{1}{\theta}x_i}
+$$
+For the uncensored values we will simply define the likelihood as the probability of observing a time value greater than the one registered for said person, thus ising the cumulative distribution function:
+$$
+L(\theta)_{censored}=P_{\theta,exp}(x_i > t)=1 - P_{\theta,exp}(x_i\leq t)=1 - (1-e^{-\frac{1}{\theta}x_i}) =e^{-\frac{1}{\theta}x_i}
+$$
+We denote censoring by $\delta_i$ for observation $x_i$ where $\delta_i=0$ indicates censoring and $\delta_i=1$ indicates uncensored data. We can rewrite the two expressions above by combining their likelihoods respectively so that the former is the combined likelihood of all uncensored data and the latter is the combined likelihood of all censored data. The combined likelihood of these is then the likelihood of our unknown parameter $\theta$ given the data X:
+$$
+\begin{split}
+L(\theta)&=\Pi_{i=1}^n p_{\theta,exp}(x_i)^{\delta_i} \cdot P_{\theta,exp}(x_i > t)^{1-\delta_i}\\
+&=\Pi_{i=1}^n \left(\frac{1}{\theta} e^{-\frac{1}{\theta}x_i}\right)^{\delta_i} \cdot \left(e^{-\frac{1}{\theta}x_i}\right)^{1-\delta_i}\\
+&=\Pi_{i=1}^n \left(\frac{1}{\theta}\right)^{\delta_i} e^{-\frac{1}{\theta}x_i\cdot\delta_i} \cdot e^{-\frac{1}{\theta}x_i\cdot(1-\delta_i)}\\
+&=\Pi_{i=1}^n \left(\frac{1}{\theta}\right)^{\delta_i} e^{-\frac{1}{\theta}x_i\cdot\delta_i + (-\frac{1}{\theta}x_i\cdot(1-\delta_i))}\\
+&=\Pi_{i=1}^n \left(\frac{1}{\theta}\right)^{\delta_i} e^{-\frac{1}{\theta}x_i\cdot\delta_i -\frac{1}{\theta}x_i+\frac{1}{\theta}x_i\cdot\delta_i}\\
+&=\Pi_{i=1}^n \left(\frac{1}{\theta}\right)^{\delta_i} e^{-\frac{1}{\theta}x_i}\\
+\end{split}
+$$
+As the base numbers in the two terms above are constant we can simply sum the exponents for each i:
+$$
+L(\theta)
+=\Pi_{i=1}^n \left(\frac{1}{\theta}\right)^{\delta_i} e^{-\frac{1}{\theta}x_i}=\left(\frac{1}{\theta}\right)^{\sum\delta_i} e^{-\frac{1}{\theta}\sum x_i}
+$$
+<!-- p. 310 to compare result -->
+To determine the MLE and the fisher information we have to determine the score function which is known as the derivative of the log-likelihood. The log-likelihood is:
+$$
+\begin{split}
+l(\theta)&=log(L(\theta))=log\left( \left(\frac{1}{\theta}\right)^{\sum\delta_i} e^{-\frac{1}{\theta}\sum x_i}\right)\\
+&=log\left( \left( \frac{1}{\theta}\right)^{\sum\delta_i} \right) + log\left(e^{-\frac{1}{\theta}\sum x_i} \right)\\
+&=\sum\delta_i\cdot log \left( \frac{1}{\theta}\right) - \frac{1}{\theta}\sum x_i
+\end{split}
+$$
+In order to easily find the score function, do note that $log(\frac{1}{\theta})=log(\theta^{-1})=-log(\theta)$:
+
+$$
+\begin{split}
+S(\theta)&
+=\frac{\partial}{\partial \theta}log(L(\theta))
+=\frac{\partial}{\partial \theta} \left( \sum\delta_i\cdot log \left( \frac{1}{\theta}\right) - \frac{1}{\theta}\sum x_i \right)\\
+&=-\sum\delta_i\cdot\frac{1}{\theta}-\left(-\frac{1}{\theta^2}\sum x_i\right)\\
+&=-\frac{\sum\delta_i}{\theta}+\frac{\sum x_i}{\theta^2}
+\end{split}
+$$
+
+Setting this expression for the score function equal to zero we can find the MLE:
+$$
+\begin{split}
+S(\theta)=0 &\Leftrightarrow -\frac{\sum\delta_i}{\theta}+\frac{\sum x_i}{\theta^2} = 0\\
+&\Leftrightarrow\frac{\sum x_i}{\theta^2} = \frac{\sum\delta_i}{\theta}\\
+&\Leftrightarrow\sum x_i=\theta\sum\delta_i\\
+&\Leftrightarrow\hat{\theta}=\frac{\sum x_i}{\sum\delta_i}
+\end{split}
+$$
+Thus we have determined the maximum likelihood estimate using an exponential model. This result can be applied to all three cases of the task: ignoring treament effect, for treatmeant effect, and for control group. NB! as the parameter was defined as the inverse of the event rate of the exponential function we have:
+$\hat{\lambda} = \frac{1}{\hat{\theta}}=\frac{\sum\delta_i}{\sum x_i}$.
+
+```{r}
+#reinit the theta hats:
+theta.hat.both<-0;theta.hat.tx<-0;theta.hat.no.tx<-0
+
+(theta.hat.both <- sum(actg$time)/sum(actg$event) ) #this ain't numerical, xD
+est.NUM$par
+
+( theta.hat.tx <- sum(actg_tx$time)/sum(actg_tx$event) )
+est.tx.NUM$par
+
+#without treatment:
+(theta.hat.no.tx <- sum(actg_no_tx$time)/sum(actg_no_tx$event) )
+est.no.tx.NUM$par
+```
+All of the analytical results correspond to the numerical results obtained earlier.
+
+Deriving an expression for the Fisher Information to obtain estimates for the standard deviation:
+Fisher Information is defined as the negative derivate of the score function:
+$$
+\begin{split}
+I(\theta)&=-\frac{\partial}{\partial\theta}S(\theta)=-\frac{\partial}{\partial\theta}\left(-\frac{\sum\delta_i}{\theta}+\frac{\sum x_i}{\theta^2}\right)\\
+&=-\left( \frac{\sum\delta_i}{\theta^2}-\frac{2\sum x_i}{\theta^3}\right)\\
+&=\frac{2\sum x_i}{\theta^3}-\frac{\sum\delta_i}{\theta^2}
+\end{split}
+$$
+Now the observed Fisher Information is then taken at the MLE $\hat{\theta}=\frac{\sum x_i}{\sum\delta_i}$:
+$$
+\begin{split}
+I(\hat{\theta})&=\frac{2\sum x_i}{\left(\frac{\sum x_i}{\sum\delta_i}\right)^3}-\frac{\sum\delta_i}{\left(\frac{\sum x_i}{\sum\delta_i}\right)^2}\\
+&=\frac{2\sum x_i\sum\delta_i^3}{\sum x_i^3}-\frac{\sum\delta_i\sum\delta_i^2}{\sum x_i^2}\\
+&=\frac{2\sum\delta_i^3}{\sum x_i^2}-\frac{\sum\delta_i^3}{\sum x_i^2}\\
+&=\frac{\sum\delta_i^3}{\sum x_i^2}\\
+&=\hat{\theta}^{-2}\sum\delta_i\\
+&=\frac{\sum\delta_i}{\hat{\theta}^2}
+\end{split}
+$$
+The variance of $\theta$ is given by $var(\theta)=I^{-1}(\theta)$ and as such since our parameter consists of only one value no matrix has to be solved and we can simply say:
+$$
+se(\hat{\theta})=\sqrt{I^{-1}(\hat{\theta})}=\sqrt{\frac{\hat{\theta}^2}{\sum\delta_i}}=\frac{\hat{\theta}}{\sqrt{\sum\delta_i}}
+$$
+The standard errors are determined analytically and compared to the numerically computed values:
+```{r}
+
+( sigma.hat.tx <- theta.hat.tx/sum(actg$event[actg$tx==1])^(1/2) )
+sd.tx.NUM
+
+(sigma.hat.no.tx <- theta.hat.no.tx/sum(actg$event[actg$tx==0])^(1/2) )
+sd.no.tx.NUM
+```
+
+<!--using test on p. 311 -->
+Testing if there is significance using the Wald statistic. Exactly the same result as when the numerical values were used.
+```{r}
+#Wald statistic for comparison
+(theta.hat.tx - theta.hat.no.tx)/sqrt(sigma.hat.tx^2 + sigma.hat.no.tx^2)
+(est.tx.NUM$par - est.no.tx.NUM$par)/sqrt(sd.tx.NUM^2 + sd.no.tx.NUM^2)
+```
+Profile likelihood for $\theta$:
+```{r}
+exp.L.fun <- function(theta, time, event){
+  L <- (1/theta)^sum(event) * exp(-sum(time)/theta)
+  return(L)
+}
+thetas.tx <- seq(theta.hat.tx-2*sd.tx.NUM, theta.hat.tx+2.5*sd.tx.NUM, by = 0.02)
+Ls <- sapply(thetas.tx, FUN = exp.L.fun, time = actg_tx$time, event = actg_tx$event)
+plot(thetas.tx, Ls/max(Ls), main = "Profile likelihood for theta for exp dist",
+     xlab=expression(theta), ylab="norm L", lwd=1.0)
+abline(a=0.15, b=0, col="red")
+
+( theta.hat.tx+c(-1,1) * qnorm(0.975) * sd.tx.NUM )
+```
+
+
+
+
 
 ```{r}
 ( sd_tr <- sqrt(V_tr) )
