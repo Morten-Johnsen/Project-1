@@ -687,12 +687,12 @@ summary(fit.glm)
 
 # Confidence interval for the two beta parameters. 
 #calculate profile likelihoods
-prof.b0 <- function(beta0, x = log.data$AIDS_yes[2], n = log.data$n[2]){
+prof.b0 <- function(beta0, x = log.data$AIDS_yes[2], n = log.data$n[2]){ #duplicate of nll.p_0
   p <- exp(beta0)/(1+exp(beta0))
   return(-sum(dbinom(x, size = n, prob = p, log = T)))
 }
 
-prof.b1 <- function(beta1, beta0, x = log.data$AIDS_yes[1], n = log.data$n[1]){
+prof.b1 <- function(beta1, beta0, x = log.data$AIDS_yes[1], n = log.data$n[1]){ #duplicate of nll.p_1
   p <- exp(beta0+beta1)/(1+exp(beta0+beta1))
   return(-sum(dbinom(x, size = n, prob = p, log = T)))
 }
