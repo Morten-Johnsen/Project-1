@@ -637,14 +637,14 @@ Same as the wald CI. The likelihood based CI is a bit more narrow.
 
 #### Derive the theoretical results for the models above, including the standard error estimates, use this to formulate and implement the profile likelihood function for the treatment parameter.
 Theoretical results for the models of the exponential distributions. BULLET POINT 3-4.
-Probabilities can be considered the probability of some data given a distribution, however, with likelihoods we want to estimate the distribution given some data. This is done by comparing the probability of observing the data given different $\theta s$. As a function of the unknown parameter the becomes:
+Probabilities can be considered the probability of some data given a distribution, however, with likelihoods we want to estimate the distribution given some data. This is done by comparing the probability of observing the data given different $\theta s$. As a function of the unknown parameter the likelihood becomes:
 $$
 L(\theta)=P_{\theta}(X=x)
 $$
 <!-- p.21 was a great inspiration #KOMMENTAR, stort P eller lille p? jeg bruger ellers lille p for pdf og stort P for cdf -->
 
 Where naturally x is the data, and $P_{\theta}$ is the pdf with parameter $\theta$. 
-Usually when we work with likelihoods we simply consider all of the observations to be independent such that we can calculate the likelihood as a product of the probabilites of each observation in data = x given the same distribution $p_{\theta}$. So if X is a vector of *n* observations and $x_i$ respresents one observation the likelihood is:
+Usually when we work with likelihoods we simply consider all of the observations to be independent such that we can calculate the likelihood as a product of the probabilites of each observation in data = x given the same distribution $p_{\theta}$. So if X is a vector of *n* observations and $x_i$ represents one observation the likelihood is:
 $$
 L(\theta)=\Pi_{i=1}^n p_{\theta}(x_i)
 $$
@@ -653,7 +653,7 @@ This brings us to how we are to interpret the uncensored and censored values. Th
 $$
 L(\theta)_{uncensored}=p_{\theta,exp}(x_i)=\frac{1}{\theta} e^{-\frac{1}{\theta}x_i}
 $$
-For the uncensored values we will simply define the likelihood as the probability of observing a time value greater than the one registered for said person, thus ising the cumulative distribution function:
+For the uncensored values we will simply define the likelihood as the probability of observing a time value greater than the one registered for said person, thus using the cumulative distribution function:
 $$
 L(\theta)_{censored}=P_{\theta,exp}(x_i > t)=1 - P_{\theta,exp}(x_i\leq t)=1 - (1-e^{-\frac{1}{\theta}x_i}) =e^{-\frac{1}{\theta}x_i}
 $$
@@ -668,7 +668,7 @@ L(\theta)&=\Pi_{i=1}^n p_{\theta,exp}(x_i)^{\delta_i} \cdot P_{\theta,exp}(x_i >
 &=\Pi_{i=1}^n \left(\frac{1}{\theta}\right)^{\delta_i} e^{-\frac{1}{\theta}x_i}\\
 \end{split}
 $$
-As the base numbers in the two terms above are constant we can simply sum the exponents for each i:
+As the base numbers in the two terms above are constant w.r.t. the summation, we can simply sum the exponents for each i:
 $$
 L(\theta)
 =\Pi_{i=1}^n \left(\frac{1}{\theta}\right)^{\delta_i} e^{-\frac{1}{\theta}x_i}=\left(\frac{1}{\theta}\right)^{\sum\delta_i} e^{-\frac{1}{\theta}\sum x_i}
@@ -723,7 +723,7 @@ est.no.tx.NUM$par
 All of the analytical results correspond to the numerical results obtained earlier.
 
 Deriving an expression for the Fisher Information to obtain estimates for the standard deviation:
-Fisher Information is defined as the negative derivate of the score function:
+Fisher Information is defined as the negative derivative of the score function:
 $$
 \begin{split}
 I(\theta)&=-\frac{\partial}{\partial\theta}S(\theta)=-\frac{\partial}{\partial\theta}\left(-\frac{\sum\delta_i}{\theta}+\frac{\sum x_i}{\theta^2}\right)\\
@@ -777,9 +777,57 @@ abline(a=0.15, b=0, col="red")
 
 ( theta.hat.tx+c(-1,1) * qnorm(0.975) * sd.tx.NUM )
 ```
+#### ALL of the above derivations were for bullet points 3-4 (exponential distributions). Now we are moving on to bullet points 5-6 (lin. reg. exp).
 
+A model that indicates treatment effect on survival time given by $E[T]=exp(\beta_0+\beta_1x)$ is called an exponential regression model as it can be linearized by taking the log: $log(T)=\beta_0+\beta_1x+\epsilon*$, where $\epsilon*$ is the error. Using slide 10 from week 7 the density function is given by the product of the hazard and the survival function: $f(t)=h(t)S(t)$. The hazard function in this case is given by the inverse of the time to event: $h(t)=exp(-\beta_0-\beta_1x)$ (slide 22). Further, the survival function is defined as the negative of the ¿cumulative? hazard function: $S(t)=exp(-H(t))$. The ¿cumulative? hazard function is simply the hazard function integrated wr.t. time from 0 to t, however, as the hazard function does not depend on the time we simply have: $H(t)=t\cdot h(t)$. Note that this means we are apparently expecting the patients to have the same risk of dying at all times!
+Knowing the ¿cumulative? hazard function it is possible to determine the density function as $S(t)=exp(-H(t))=exp(-t\cdot h(t))=exp(-t\cdot exp(-\beta_0-\beta_1x))$, so:
+$$
+f(t)=h(t)S(t)=h(t)\cdot e^{-H(t)}=e^{-\beta_0-\beta_1x}\cdot e^{-t\cdot e^{(-\beta_0-\beta_1x)}}
+$$
+Then, if we denote an event as $d_i=1$ for uncensored events and $d_i=0$ for censored events then we can start deriving the likelihood function. Notice, that if all events were uncensored then the likelihood function should simply be the product of the f(t) for all of the given times as we are used to do it, however, the censored data complicates the process a bit. We remember from the above derivation for the earlier exponential distribution that:$P_{\theta,exp}(x_i > t)=1 - P_{\theta,exp}(x_i\leq t)=1 - (1-e^{-\frac{1}{\theta}x_i}) =e^{-\frac{1}{\theta}x_i}$, then if $x_i$ is replaced by time $t$ in general and $\theta$ by the expression of the exponential linear regression that we want to use to estimate said unknown parameter then we get:
+$$
+P_{\theta,exp}(x_i > t)=e^{-\frac{1}{\theta}x_i}=e^{-\frac{t}{e^{\beta_0+\beta_1x}}}
+$$
+Keep in mind that this is the probability of *surviving* to time $t$, so this is in fact the survival function! If the reader does not fully trust this statement, do consult the above expression for f(t) and realise that $e^{-H(t)}=e^{-t\cdot e^{(-\beta_0-\beta_1x)}}=e^{-\frac{t}{e^{\beta_0+\beta_1x}}}=S(t)$. Thus the likelihood must be ($\beta=(\beta_0,\beta_1)$):
+$$
+L(\beta)=\prod_{i=1}^n f(t_i)^{d_i}\cdot S(t_i)^{1-d_i}
+$$
+Remember the definition of the density function: $f(t)=h(t)S(t)$:
+$$
+f(t_i)^{d_i}\cdot S(t_i)^{1-d_i}=(h(t_i)S(t_i))^{d_i}\cdot S(t_i)^{1-d_i}=h(t_i)^{d_i}S(t_i)^{d_i}S(t_i)^{1-d_i}=h(t_i)^{d_i}S(t_i)^{d_i+(1-d_i)}=h(t_i)^{d_i}S(t_i)
+$$
 
+And as such we have derived the likelihood whilst still taking censored data into account:
+$$
+L(\beta)=\prod_{i=1}^n h(t_i)^{d_i}S(t_i)
+$$
+The log-likelihood becomes:
+$$
+\begin{split}
+l(\beta)=log(L(\beta))&=log\left(\prod_{i=1}^n h(t_i)^{d_i}S(t_i)\right)\\
+&=\sum_{i=1}^n log(h(t_i)^{d_i}S(t_i))\\
+&=\sum_{i=1}^nlog(h(t_i)^{d_i})+log(S(t_i))\\
+&=\sum_{i=1}^nd_ilog(h(t_i))-H(t_i)
+\end{split}
+$$
 
+Finding the score function to determine MLEs:
+$$
+\begin{split}
+S(\beta)=\frac{\partial}{\partial\beta}(l(\beta))&=\frac{\partial}{\partial\beta}(\sum_{i=1}^nd_ilog(h(t_i))-H(t_i))\\
+&=
+\end{split}
+$$
+
+```{r}
+#can't estimate MLEs... wtf
+
+# beta_hat$par
+# 
+# -log( (1-sum(actg$event))/sum(actg$time) ) - beta_hat$par[2] * sum(actg$tx)#beta_hat_0...
+# 
+# ( -log( (actg$time - actg$event) / (actg$time * actg$tx) ) - beta_hat$par[1] ) / actg$tx#beta_hat_1...
+```
 
 
 ```{r}
