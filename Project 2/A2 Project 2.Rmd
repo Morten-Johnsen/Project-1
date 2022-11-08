@@ -196,12 +196,12 @@ cat("The wald test statistic = ",waldTestStatistic,
 Calculating the score function for the logistic regression model. 
 $$
 S(\theta) = \dfrac{1}{\theta} \sum_i y_i + \dfrac{1}{1+\theta} \sum_i 1-y_i
-$$\
+$$
 
 ```{r}
 #ikke færdig
 
-score.nll.log(log.reg$par) / sqrt(solve(hessian(func = score.nll.log, x = log.reg$par)))
+score.nll.log(log.reg$par)^2 / solve(hessian(func = score.nll.log, x = log.reg$par))
 ```
 
 ## Analysis of the survival time data

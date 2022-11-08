@@ -19,10 +19,19 @@ outs[["none"]] <- kaplan.meier(data = data, event = event, time = time)
 for (i in groups){
   outs[[paste(i)]] <- kaplan.meier(data = filter(data, !!sym(group) == i), event = event, time = time)
   
-  outs$none %>%
-    left_join(outs[[paste(i)]], by = 't') %>%
-    group_by('t') %>%
-    summarise(e = sum(R.y * d.x/R.x, na.rm = T)) -> e[[paste(i)]]
+  tmp <- outs$none %>%
+    left_join(outs[[paste(i)]], by = 't')
+  
+  for (j in dim(tmp)[1]:1){
+    if(is.na(tmp[j,8])){
+      tmp[j,-(1:7)] <- tmp[j+1,-(1:7)]
+      tmp$d.y[j] <- 0
+      tmp$censored.y[j] <- 0
+    }
+  }
+  
+  tmp %>%
+    mutate(e = R.y * d.x/R.x) -> e[[paste(i)]]
     #mutate(e = R.y * d.x / R.x)-> e[[paste(i)]]
 }
 
@@ -32,12 +41,12 @@ w <- 1
 e$`0` %>%
   mutate(v = e*((R.x - d.x)/R.x)*((R.x-R.y)/(R.x - 1))) -> e$`0`
 Q0 <- sum(w*(e$`0`$d.y - e$`0`$e), na.rm = T)^2 / sum(w^2 * e$`0`$v, na.rm = T)
-cat("Observed: ", sum(e$`0`$d.y, na.rm = T), ", Expected: ", sum(e$`0`$e, na.rm = T), ", (O-E)^2/E =", sum((e$`0`$d.y - e$`0`$e)^2 / e$`0`$e, na.rm = T))
+cat("Observed: ", sum(e$`0`$d.y, na.rm = T), ", Expected: ", sum(e$`0`$e, na.rm = T), ", (O-E)^2/V =", (sum(e$`0`$d.y) - sum(e$`0`$e))^2/sum(e$`0`$v))
 
  e$`1` %>%
   mutate(v = e*((R.x - d.x)/R.x)*((R.x-R.y)/(R.x - 1))) -> e$`1`
 Q1 <- sum(w*(e$`1`$d.y - e$`1`$e))^2 / sum(w^2 * e$`1`$v, na.rm = T)
-cat("Observed: ", sum(e$`1`$d.y), ", Expected: ", sum(e$`1`$e), ", (O-E)^2/E =", sum((e$`1`$d.y - e$`1`$e)^2 / e$`1`$e, na.rm = T))
+cat("Observed: ", sum(e$`1`$d.y), ", Expected: ", sum(e$`1`$e), ", (O-E)^2/V =", (sum(e$`1`$d.y) - sum(e$`1`$e))^2/sum(e$`1`$v))
 
 library(survival)
 fit <- survfit(Surv(time, event) ~ tx, data = actg)
