@@ -109,7 +109,7 @@ score.nll.log <- function(theta){
   
   theta <- exp(beta0 + beta1 * treatment)/(1 + exp(beta0 + beta1 * treatment))
   
-  score <- -sum(event/theta - (n - event)/(1 - theta))
+  score <- -sum(event/theta - (1 - event)/(1 - theta))
   return(score)
 }
 
@@ -160,7 +160,7 @@ nll.log.no.effect <- function(theta, event, n, treatment){
   
   nll <- -sum(log(theta)*event  + log(1-theta)*(n - event))
   return(nll)
-}
+} 
 
 log.reg.no.effect <- nlminb(start = 1, objective = nll.log.no.effect
                         , event = sum(log.data$AIDS_yes)
@@ -199,10 +199,39 @@ S(\theta) = \dfrac{1}{\theta} \sum_i y_i + \dfrac{1}{1+\theta} \sum_i 1-y_i
 $$
 
 ```{r}
-#ikke færdig
+#Page 259
 
-score.nll.log(log.reg$par)^2 / solve(hessian(func = score.nll.log, x = log.reg$par))
+p <- function(beta,x){
+  x <- rbind(1,x)
+  out <- exp(beta %*% x)/(1 + exp(beta %*% x))
+  return(as.numeric(out))
+}
+
+y <- c(rep(c(1,0),c(log.data$AIDS_yes[1], log.data$n[1]-log.data$AIDS_yes[1]))
+       ,rep(c(1,0),c(log.data$AIDS_yes[2], log.data$n[2]-log.data$AIDS_yes[2])))
+treatment <- rep(c(1,0), c(log.data$n[1],log.data$n[2]))
+
+theta <- p(c(log.reg.no.effect$par,0), treatment)
+
+score <- function(theta,treatment,y){
+  score <- sum((y - theta)*treatment)
+  return(score)
+}
+
+information <- function(theta,treatment,y){
+  info <- sum(theta * (1 - theta) * treatment^2)
+  return(info)
+}
+
+2*pnorm(score(theta,treatment,y) / sqrt(information(theta,treatment,y)))
 ```
+
+The score test show that the null hypothesis stating $H_0$: $\theta = \theta_0$ - where $\theta_0$ is the population average - can be rejected on a significance level of $\alpha = 0.05$, thus showing that there's a difference in the risk of developing AIDS between the two treatment groups. This conclusion aligns with the results from the Wald test and the Log-Ratio Test. If the score test had shown that the p-value was above the $\alpha$ level, then it would have shown no difference between the $\theta_0$ and the actual MLE $\theta$. The intuitive interpretation of the Score test is that: *if the restricted estimator ($\theta_0$/the population level probability of the given event) is near the true MLE, then the score value $S(\theta_0)$, should not differ from 0 by more than $\approx$ 2 times the sample standard deviation.
+
+The advantage of the Score statistic is that we do not need to perform calculations of the MLE, $\theta$, before being able to identify whether there is a difference between the two populations.
+
+The score statistic is basically examining whether $S(\theta_0)$ is within $\approx 2 \sigma$ of 0. If it is, then it is possible that $\theta_0 = \theta$. Higher score function values, thus indicate a difference between the data set groups. 
+
 
 ## Analysis of the survival time data
 
@@ -268,8 +297,13 @@ ggsurvplot(kaplan.meier
 
 See slides 31-33 from week 6 for calculations by hand.
 
+Manual Log-rank test:
+
 ```{r}
-survdiff(Surv(time, event) ~ tx, data = actg)
+source("../kaplan-meier-manual.R")
+source("../Manuel Log-rant (TEST).R")
+
+logRank(data = actg, group = "tx", event = "event", time = "time")
 ```
 
 p-value of 0.001, thus there is a significant difference between the two treatment groups based on a significance level of 0.05.
@@ -287,7 +321,7 @@ loglogistic.model <- survreg(Surv(time, event) ~ tx + cd4, data = actg, dist = "
 ```
 
 ```{r}
-summary(exp.model)
+#summary(exp.model)
 
 nll.exp <- function(theta
                     , time = actg$time
@@ -315,7 +349,7 @@ exp.model.manual.AIC <- - 2 * exp.model.manual$objective - 2 * 3
 Use: slide 10 for f(t), S(t), h(t) and H(t) relationships, slide 19 for general log-likelihood expression for censored data, slide 55 for S(t) and *z*, slide 60 for h(t).
 
 ```{r}
-summary(weibull.model)
+#summary(weibull.model)
 
 nll.wei <- function(theta
                     , time = actg$time
@@ -339,7 +373,7 @@ weibull.model.manual.AIC <- 2 * weibull.model.manual$objective + 2 * length(weib
 ```
 
 ```{r}
-summary(loglogistic.model)
+#summary(loglogistic.model)
 
 nll.loglog <- function(theta
                     , time = actg$time
