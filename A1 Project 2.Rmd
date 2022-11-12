@@ -779,49 +779,131 @@ abline(a=0.15, b=0, col="red")
 ```
 #### ALL of the above derivations were for bullet points 3-4 (exponential distributions). Now we are moving on to bullet points 5-6 (lin. reg. exp).
 
-A model that indicates treatment effect on survival time given by $E[T]=exp(\beta_0+\beta_1x)$ is called an exponential regression model as it can be linearized by taking the log: $log(T)=\beta_0+\beta_1x+\epsilon*$, where $\epsilon*$ is the error. Using slide 10 from week 7 the density function is given by the product of the hazard and the survival function: $f(t)=h(t)S(t)$. The hazard function in this case is given by the inverse of the time to event: $h(t)=exp(-\beta_0-\beta_1x)$ (slide 22). Further, the survival function is defined as the negative of the ¿cumulative? hazard function: $S(t)=exp(-H(t))$. The ¿cumulative? hazard function is simply the hazard function integrated wr.t. time from 0 to t, however, as the hazard function does not depend on the time we simply have: $H(t)=t\cdot h(t)$. Note that this means we are apparently expecting the patients to have the same risk of dying at all times!
-Knowing the ¿cumulative? hazard function it is possible to determine the density function as $S(t)=exp(-H(t))=exp(-t\cdot h(t))=exp(-t\cdot exp(-\beta_0-\beta_1x))$, so:
+A model that indicates treatment effect on survival time given by $E[T]=exp(\beta_0+\beta_1x)$ is called an exponential regression model as it can be linearized by taking the log: $log(T)=\beta_0+\beta_1x+\epsilon*$, where $\epsilon*$ is the error. Using slide 10 from week 7 the density function is given by the product of the hazard and the survival function: $f(t)=h(t)S(t)$. The hazard function in this case is given by the inverse of the time to event: $h(t)=exp(-\beta_0-\beta_1x)$ (slide 22). Further, the survival function is defined as the negative of the ¿cumulative? hazard function: $S(t)=exp(-H(t))$. The ¿cumulative? hazard function is simply the hazard function integrated w.r.t. time from 0 to t, however, as the hazard function does not depend on the time we simply have: $H(t)=t\cdot h(t)$. Note that this means we are apparently expecting the patients to have the same risk of dying at all times!
+Knowing the ¿cumulative? hazard function it is possible to determine the survival function as $S(t)=exp(-H(t))=exp(-t\cdot h(t))=exp(-t\cdot exp(-\beta_0-\beta_1x))$, so:
 $$
 f(t)=h(t)S(t)=h(t)\cdot e^{-H(t)}=e^{-\beta_0-\beta_1x}\cdot e^{-t\cdot e^{(-\beta_0-\beta_1x)}}
 $$
-Then, if we denote an event as $d_i=1$ for uncensored events and $d_i=0$ for censored events then we can start deriving the likelihood function. Notice, that if all events were uncensored then the likelihood function should simply be the product of the f(t) for all of the given times as we are used to do it, however, the censored data complicates the process a bit. We remember from the above derivation for the earlier exponential distribution that:$P_{\theta,exp}(x_i > t)=1 - P_{\theta,exp}(x_i\leq t)=1 - (1-e^{-\frac{1}{\theta}x_i}) =e^{-\frac{1}{\theta}x_i}$, then if $x_i$ is replaced by time $t$ in general and $\theta$ by the expression of the exponential linear regression that we want to use to estimate said unknown parameter then we get:
-$$
-P_{\theta,exp}(x_i > t)=e^{-\frac{1}{\theta}x_i}=e^{-\frac{t}{e^{\beta_0+\beta_1x}}}
-$$
-Keep in mind that this is the probability of *surviving* to time $t$, so this is in fact the survival function! If the reader does not fully trust this statement, do consult the above expression for f(t) and realise that $e^{-H(t)}=e^{-t\cdot e^{(-\beta_0-\beta_1x)}}=e^{-\frac{t}{e^{\beta_0+\beta_1x}}}=S(t)$. Thus the likelihood must be ($\beta=(\beta_0,\beta_1)$):
-$$
-L(\beta)=\prod_{i=1}^n f(t_i)^{d_i}\cdot S(t_i)^{1-d_i}
-$$
-Remember the definition of the density function: $f(t)=h(t)S(t)$:
-$$
-f(t_i)^{d_i}\cdot S(t_i)^{1-d_i}=(h(t_i)S(t_i))^{d_i}\cdot S(t_i)^{1-d_i}=h(t_i)^{d_i}S(t_i)^{d_i}S(t_i)^{1-d_i}=h(t_i)^{d_i}S(t_i)^{d_i+(1-d_i)}=h(t_i)^{d_i}S(t_i)
-$$
-
-And as such we have derived the likelihood whilst still taking censored data into account:
-$$
-L(\beta)=\prod_{i=1}^n h(t_i)^{d_i}S(t_i)
-$$
-The log-likelihood becomes:
+Then, if we denote an event as $d_i=1$ for uncensored events and $d_i=0$ for censored events then we can start deriving the likelihood function. Notice, that if all events were uncensored then the likelihood function should simply be the product of the f(t) for all of the given times as we are used to do it, however, the censored data complicates the process a bit. This is due to the fact that we need to find a way such that we can quantify the probability of surviving for longer that T: $P(T \leq t)$. Luckily, this is exactly what the survival function is for! Before writing up the likelihood we will summarize all of the definitions that will be used:
 $$
 \begin{split}
-l(\beta)=log(L(\beta))&=log\left(\prod_{i=1}^n h(t_i)^{d_i}S(t_i)\right)\\
-&=\sum_{i=1}^n log(h(t_i)^{d_i}S(t_i))\\
-&=\sum_{i=1}^nlog(h(t_i)^{d_i})+log(S(t_i))\\
-&=\sum_{i=1}^nd_ilog(h(t_i))-H(t_i)
+T&=e^{\beta_0+\beta_1x_i}=h^{-1}\\
+S(t)&=e^{\frac{-t_i}{e^{\beta_0+\beta_1x_i}}}=e^{-H(t)}\\
+h(t)&=e^{-\beta_0-\beta_1x_i}=T^{-1}\\
+H(t)&=\frac{t_i}{e^{\beta_0+\beta_1x_i}}=-log(S(t))\\
+f(t)&=h(t)S(t)
 \end{split}
 $$
 
-Finding the score function to determine MLEs:
+We can write the likelihood:
 $$
 \begin{split}
-S(\beta)=\frac{\partial}{\partial\beta}(l(\beta))&=\frac{\partial}{\partial\beta}(\sum_{i=1}^nd_ilog(h(t_i))-H(t_i))\\
-&=
+L(\theta)&=\Pi_{i=1}^n f(t_i)^{\delta_i}S(t_i)^{1-\delta_i}\\
+&=\Pi_{i=1}^n h(t_i)^{\delta_i}S(t_i)^{\delta_i}S(t_i)^{1-\delta_i}\\
+&=\Pi_{i=1}^n h(t_i)^{\delta_i}S(t_i)
 \end{split}
 $$
+
+Using the relationship between the ¿cumulative? hazard function and the survival function:
+$$
+L(\theta)=\Pi_{i=1}^n h^{\delta_i}e^{-H(t_i)}
+$$
+Notice that from this point onwards we will be using $h(t_i)=h$ as the hazard function is independent of the time $t$ anyways. The log-likelihood becomes:
+$$
+\begin{split}
+l(\theta)=log(L(\theta))&=log\left(\Pi_{i=1}^n h^{\delta_i}e^{-H(t_i)}\right)\\
+&=\sum_{i=1}^n log\left(h^{\delta_i}e^{-H(t_i)}\right)\\
+&=\sum_{i=1}^n \delta_i\cdot log(h)+log\left(e^{-H(t_i)}\right)\\
+&=\sum_{i=1}^n \delta_i\cdot log(h)-H(t_i)\\
+&=\sum_{i=1}^n \delta_i\cdot log(e^{-\beta_0-\beta_1x_i})-t_i\cdot h\\
+&=\sum_{i=1}^n \delta_i\cdot (-\beta_0-\beta_1x_i)-t_i\cdot e^{-\beta_0-\beta_1x_i}
+
+\end{split}
+$$
+The two score functions will now be derived and set to zero. Firstly, w.r.t. $\beta_0$:
+$$
+\begin{split}
+S(\theta)_{\beta_0}&=\frac{\partial}{\partial\beta_0}(l(\theta))\\
+&=\sum_{i=1}^n -\delta_i+t_i\cdot e^{-\beta_0-\beta_1x_i}\\
+&\Leftrightarrow\\
+\sum_{i=1}^n \delta_i&=\sum_{i=1}^n t_i\cdot e^{-\beta_0-\beta_1x_i}
+\end{split}
+$$
+
+And w.r.t. $\beta_1$:
+$$
+\begin{split}
+S(\theta)_{\beta_1}&=\frac{\partial}{\partial\beta_0}(l(\theta))\\
+&=\sum_{i=1}^n -\delta_i\cdot x_i+t_i\cdot x_i\cdot e^{-\beta_0-\beta_1x_i}\\
+&\Leftrightarrow\\
+\sum_{i=1}^n \delta_i\cdot x_i&=\sum_{i=1}^n t_i\cdot x_i\cdot e^{-\beta_0-\beta_1x_i}
+\end{split}
+$$
+For $\beta_1$ only values of the treatment binary variable $x_i=1$ are of relevance as both summations equal 0 for $x_i=0$. Due to this we can make the exponential term independent of the summation by setting $x_i=1$ for the exponent. The reason as to why $x_i$ is not removed altogether is that the expression has to be true even when taken out of context:
+$$
+\begin{split}
+\sum_{i=1}^n \delta_i\cdot x_i&=\sum_{i=1}^n t_i\cdot x_i\cdot e^{-\beta_0-\beta_1x_i} =\sum_{i=1}^n t_i\cdot x_i\cdot e^{-\beta_0-\beta_1}\\
+&\Leftrightarrow\\
+\sum_{i=1}^n \delta_i\cdot x_i &=e^{-\beta_0-\beta_1} \sum_{i=1}^n t_i\cdot x_i\\
+e^{\beta_0+\beta_1}&=\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\\
+\beta_0+\beta_1&=log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)\\
+\beta_1&=log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)-\beta_0
+\end{split}
+$$
+This can be inserted in the expression that was derived from the score equation where we differentiated w.r.t. $\beta_0$:
+$$
+\begin{split}
+\sum_{i=1}^n \delta_i&=\sum_{i=1}^n t_i\cdot e^{-\beta_0-\beta_1x_i}\\
+&\Leftrightarrow\\
+\sum_{i=1}^n \delta_i&=\sum_{i=1}^n t_i\cdot e^{-\beta_0-\left(log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)-\beta_0\right)x_i}\\
+\sum_{i=1}^n \delta_i&=\sum_{i=1}^n t_i\cdot e^{-\beta_0+\beta_0\cdot x_i-log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)\cdot x_i}\\
+\sum_{i=1}^n \delta_i&=\sum_{i=1}^n t_i\cdot e^{\beta_0\cdot (x_i-1)-log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)\cdot x_i}\\
+\end{split}
+$$
+Notice that we have two distinct results for $x_i=0$ and $x_i=1$ respectively:
+$$
+\begin{split}
+for& \;\;x_i=0:\;\; \beta_0\cdot (0-1)&-log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)\cdot 0=-\beta_0\\
+for&\;\; x_i=1: \;\; \beta_0\cdot (1-1)&-log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)\cdot 1=-log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)=log\left(\frac{\sum_{i=1}^n \delta_i\cdot x_i}{\sum_{i=1}^n t_i\cdot x_i}\right)
+\end{split}
+$$
+We can then divide the summation $\sum_{i=1}^n t_i\cdot e^{\beta_0\cdot (x_i-1)-log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)\cdot x_i}$ into two distinct sums:
+$$
+\begin{split}
+for& \;\;x_i=0:\;\; \sum_{i=1}^n t_i\cdot (1-x_i)\cdot e^{-\beta_0}= e^{-\beta_0}\cdot\sum_{i=1}^n t_i\cdot (1-x_i)\\
+for&\;\; x_i=1: \;\; \sum_{i=1}^n t_i\cdot x_i\cdot e^{log\left(\frac{\sum_{i=1}^n \delta_i\cdot x_i}{\sum_{i=1}^n t_i\cdot x_i}\right)}=e^{log\left(\frac{\sum_{i=1}^n \delta_i\cdot x_i}{\sum_{i=1}^n t_i\cdot x_i}\right)}\cdot\sum_{i=1}^n t_i\cdot x_i=\sum_{i=1}^n \delta_i\cdot x_i
+\end{split}
+$$
+And so we get the following expression re-inserting this right hand side. NB! Now we have two separate sums on the right hand side:
+$$
+\begin{split}
+\sum_{i=1}^n \delta_i&=\sum_{i=1}^n t_i\cdot e^{\beta_0\cdot (x_i-1)-log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)\cdot x_i}=e^{-\beta_0}\cdot\sum_{i=1}^n t_i\cdot (1-x_i)+\sum_{i=1}^n \delta_i\cdot x_i\\
+\end{split}
+$$
+We can now isolate $\beta_0$:
+$$
+\begin{split}
+\sum_{i=1}^n \delta_i&=e^{-\beta_0}\cdot\sum_{i=1}^n t_i\cdot (1-x_i)+\sum_{i=1}^n \delta_i\cdot x_i\\
+&\Leftrightarrow\\
+\sum_{i=1}^n \delta_i-\sum_{i=1}^n \delta_i\cdot x_i&=e^{-\beta_0}\cdot\sum_{i=1}^n t_i\cdot (1-x_i)\\
+&\Leftrightarrow\\
+\sum_{i=1}^n \delta_i\cdot(1-x_i)&=e^{-\beta_0}\cdot\sum_{i=1}^n t_i\cdot (1-x_i)\\
+&\Leftrightarrow\\
+e^{\beta_0}&=\frac{\sum_{i=1}^n t_i\cdot (1-x_i)}{\sum_{i=1}^n \delta_i\cdot(1-x_i)}\\
+&\Leftrightarrow\\
+\beta_0&=log\left(\frac{\sum_{i=1}^n t_i\cdot (1-x_i)}{\sum_{i=1}^n \delta_i\cdot(1-x_i)}\right)
+\end{split}
+$$
+Finally we have arrived at an analytical expression for the nuisance parameter $\beta_0$ and can use this to finally define an analytical expression for the treatment parameter:
+$$
+\begin{split}
+\beta_1&=log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)-\beta_0
+\end{split}
+$$
+Where, naturally, $\beta_0=log\left(\frac{\sum_{i=1}^n t_i\cdot (1-x_i)}{\sum_{i=1}^n \delta_i\cdot(1-x_i)}\right)$.
 
 ```{r}
-#can't estimate MLEs... wtf
-
+#we compare the analytical result to the ones by glm survfit and numerical optimization:
 summary(fit)
 beta_hat$par
 beta_0_theo <- log(sum(actg$time * (1 - actg$tx)) / sum(actg$event*(1 - actg$tx)))
