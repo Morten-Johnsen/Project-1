@@ -845,8 +845,11 @@ $$
 \sum_{i=1}^n \delta_i\cdot x_i&=\sum_{i=1}^n t_i\cdot x_i\cdot e^{-\beta_0-\beta_1x_i} =\sum_{i=1}^n t_i\cdot x_i\cdot e^{-\beta_0-\beta_1}\\
 &\Leftrightarrow\\
 \sum_{i=1}^n \delta_i\cdot x_i &=e^{-\beta_0-\beta_1} \sum_{i=1}^n t_i\cdot x_i\\
+&\Leftrightarrow\\
 e^{\beta_0+\beta_1}&=\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\\
+&\Leftrightarrow\\
 \beta_0+\beta_1&=log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)\\
+&\Leftrightarrow\\
 \beta_1&=log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)-\beta_0
 \end{split}
 $$
@@ -856,7 +859,9 @@ $$
 \sum_{i=1}^n \delta_i&=\sum_{i=1}^n t_i\cdot e^{-\beta_0-\beta_1x_i}\\
 &\Leftrightarrow\\
 \sum_{i=1}^n \delta_i&=\sum_{i=1}^n t_i\cdot e^{-\beta_0-\left(log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)-\beta_0\right)x_i}\\
+&\Leftrightarrow\\
 \sum_{i=1}^n \delta_i&=\sum_{i=1}^n t_i\cdot e^{-\beta_0+\beta_0\cdot x_i-log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)\cdot x_i}\\
+&\Leftrightarrow\\
 \sum_{i=1}^n \delta_i&=\sum_{i=1}^n t_i\cdot e^{\beta_0\cdot (x_i-1)-log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)\cdot x_i}\\
 \end{split}
 $$
@@ -900,7 +905,7 @@ $$
 \beta_1&=log\left(\frac{\sum_{i=1}^n t_i\cdot x_i}{\sum_{i=1}^n \delta_i\cdot x_i}\right)-\beta_0
 \end{split}
 $$
-Where, naturally, $\beta_0=log\left(\frac{\sum_{i=1}^n t_i\cdot (1-x_i)}{\sum_{i=1}^n \delta_i\cdot(1-x_i)}\right)$.
+Where, naturally, $\beta_0=log\left(\frac{\sum_{i=1}^n t_i\cdot (1-x_i)}{\sum_{i=1}^n \delta_i\cdot(1-x_i)}\right)$ from above.
 
 ```{r}
 #we compare the analytical result to the ones by glm survfit and numerical optimization:
