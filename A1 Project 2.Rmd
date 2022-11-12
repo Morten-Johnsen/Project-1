@@ -822,7 +822,11 @@ $$
 ```{r}
 #can't estimate MLEs... wtf
 
-# beta_hat$par
+summary(fit)
+beta_hat$par
+beta_0_theo <- log(sum(actg$time * (1 - actg$tx)) / sum(actg$event*(1 - actg$tx)))
+beta_1_theo <- log(sum(actg$time * actg$tx) / sum(actg$event * actg$tx)) -  beta_0_theo
+beta_0_theo;beta_1_theo
 # 
 # -log( (1-sum(actg$event))/sum(actg$time) ) - beta_hat$par[2] * sum(actg$tx)#beta_hat_0...
 # 
