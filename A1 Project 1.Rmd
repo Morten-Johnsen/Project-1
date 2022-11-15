@@ -455,6 +455,9 @@ pow.fun <- function(mu, sd, data){
 l.pow.fun <- function(mu, sd, data){
   return( -sum( dnorm(x = data, mean = mu, sd = sd, log = T) ) )
 }
+nl.pow.funp <- function(p, data){
+  return( -sum( dnorm(x = data, mean = p[1], sd = p[2], log = T) ) )
+}
 
 #wald
 n <- dim(D)[1]
@@ -464,6 +467,13 @@ H.pow.sd <- hessian(l.pow.fun, mle.pow[2], mu = mle.pow[1], data = D$transformed
 V.pow.sd <- as.numeric(1/H.pow.sd)
 wald.pow.mu <- mle.pow[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.pow.mu)
 wald.pow.sd <- mle.pow[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.pow.sd)
+
+H.pow.mu.m <- hessian(func = nl.pow.funp, x = theta.hat.y$par, data = D$transformed.pow.obs.norm)
+sd.pow.mu.m <- sqrt(diag(solve(H.pow.mu.m)))
+wald.pow.mu.m <- theta.hat.y$par[1] + c(-1,1) * qnorm(1-alpha/2) * sd.pow.mu.m[1]
+wald.pow.sd.m <- theta.hat.y$par[2] + c(-1,1) * qnorm(1-alpha/2) * sd.pow.mu.m[2]
+
+round( rbind( wald.pow.mu, wald.pow.mu.m, wald.pow.sd, wald.pow.sd.m, theta.hat.y$par ), digits = 3 )
 
 par(mfrow=c(1,2))
 mus <- seq(1.9, 3.3, by = 0.01)
@@ -497,6 +507,9 @@ pow.fun <- function(shape1, shape2, data){
 
 l.pow.fun <- function(shape1, shape2, data){
   return( sum( dbeta(x = data, shape1 = shape1, shape2 = shape2, log = T) ) )
+}
+l.pow.funp.beta <- function(p, data){
+  return( -sum( dbeta(x = data, shape1 = p[1], shape2 = p[2], log = T) ) )
 }
 
 CIfun.pow <- function(y, first = T){##### T for shape, F for scale
@@ -536,6 +549,14 @@ H.pow.shape2 <- hessian(l.pow.fun, mle.pow[2], shape1 = mle.pow[1], data = D$pow
 V.pow.shape2 <- as.numeric(-1/H.pow.shape2)
 wald.pow.shape1 <- mle.pow[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.pow.shape1)
 wald.pow.shape2 <- mle.pow[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.pow.shape2)
+
+#wald m. matrix
+H.pow.shapes.m <- hessian(func = l.pow.funp.beta, x = par.beta$par, data = D$pow.obs.norm)
+sd.pow.shapes.m <- sqrt(diag(solve(H.pow.shapes.m)))
+wald.pow.shape1.m <- par.beta$par[1] + c(-1,1) * qnorm(1-alpha/2) * sd.pow.shapes.m[1]
+wald.pow.shape2.m <- par.beta$par[2] + c(-1,1) * qnorm(1-alpha/2) * sd.pow.shapes.m[2]
+
+round( rbind( CI.pow1, wald.pow.shape1, wald.pow.shape1.m, CI.pow2, wald.pow.shape2, wald.pow.shape2.m, mle.pow ), digits = 3 )
 ```
 
 ##### Wind speed
@@ -553,6 +574,9 @@ ws30.fun <- function(shape, scale, data){#####
 
 l.ws30.fun <- function(shape, scale, data){#####
   sum(dweibull(x = data, shape = shape, scale = scale, log = T))
+}
+nl.ws30.funp <- function(p, data){
+  return(-sum(dweibull(x = data, shape = p[1], scale = p[2], log = T)))
 }
 
 CIfun.ws30 <- function(y, shape = T){##### T for shape, F for scale
@@ -590,6 +614,16 @@ H.ws30.scale <- hessian(l.ws30.fun, mle.ws30.weib[2], shape = mle.ws30.weib[1], 
 V.ws30.scale <- as.numeric(-1/H.ws30.scale)
 wald.ws30.shape <- mle.ws30.weib[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30.shape)
 wald.ws30.scale <- mle.ws30.weib[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30.scale)
+
+#wald m. matrix
+H.ws30.m <- hessian(func = nl.ws30.funp, x = par.ws30$par, data = D$ws30)
+sd.ws30.m <- sqrt(diag(solve(H.ws30.m)))
+wald.ws30.shape.m <- par.ws30$par[1] + c(-1,1) * qnorm(1-alpha/2) * sd.ws30.m[1]
+wald.ws30.scale.m <- par.ws30$par[2] + c(-1,1) * qnorm(1-alpha/2) * sd.ws30.m[2]
+
+round( rbind( CI.ws30.shape, wald.ws30.shape, wald.ws30.shape.m, CI.ws30.scale, wald.ws30.scale,
+              wald.ws30.scale.m, mle.ws30.weib ), digits = 3 )
+
 ```
 Expected value of the distribution and its uncertainty
 ```{r}
@@ -643,6 +677,9 @@ repar.ws30.fun <- function(shape, theta, data){#####
 repar.l.ws30.fun <- function(shape, theta, data){#####
   sum(dweibull(x = data, shape = shape, scale = theta / gamma(1 + 1/shape), log = T))
 }
+repar.l.ws30.funp <- function(p, data){#####
+  return(-sum(dweibull(x = data, shape = p[1], scale = p[2] / gamma(1 + 1/p[1]), log = T)))
+}
 
 CIfun.repar.ws30 <- function(y, data, mles){##### T for shape, F for scale
   k <- mles[1]
@@ -663,6 +700,13 @@ lines(range(Es), c*c(1,1), col = 2)
 H.ws30.E <- hessian(repar.l.ws30.fun, repar.E.ws30$par[2], shape = repar.E.ws30$par[1], data = D$ws30)
 V.ws30.E <- as.numeric(-1/H.ws30.E)
 wald.ws30.E <- repar.E.ws30$par[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30.E)
+
+H.ws30.E.m <- hessian(func = repar.l.ws30.funp, x = repar.E.ws30$par, data = D$ws30)
+sd.ws30.E.m <- sqrt(diag(solve(H.ws30.E.m)))
+wald.ws30.E.m <- repar.E.ws30$par[2] + c(-1,1) * qnorm(1-alpha/2) * sd.ws30.E.m[2]
+
+round( rbind( wald.ws30.E, wald.ws30.E.m), digits = 3);repar.E.ws30$par[2]
+
 ```
 
 ##### Wind direction 
@@ -681,6 +725,9 @@ wd30.fun <- function(mu, rho, data){#####
 
 l.wd30.fun <- function(mu, rho, data){#####
   sum( log( dwrappedcauchy(x = data, mu = mu, rho = rho) ) )
+}
+nl.wd30.funp <- function(p, data){#####
+  return(-sum( log( dwrappedcauchy(x = data, mu = p[1], rho = p[2]) ) ))
 }
 
 CIfun.wd30 <- function(y, mu = T){##### T from mean, F for sigma
@@ -720,23 +767,45 @@ V.wd30.rho <- as.numeric(-1/H.wd30.rho)
 wald.wd30.mu <- mle.wd30[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.wd30.mu)
 wald.wd30.rho <- mle.wd30[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.wd30.rho)
 
+#wald m. matrix
+H.wd30.m <- hessian(func = nl.wd30.funp, x = wrapped.cauc.par$par,  data = D$wd30)
+sd.wd30.m <- sqrt(diag(solve(H.wd30.m)))
+wald.wd30.mu.m <- wrapped.cauc.par$par[1] + c(-1,1) * qnorm(1-alpha/2) * sd.wd30.m[1]
+wald.wd30.rho.m <- wrapped.cauc.par$par[2] + c(-1,1) * qnorm(1-alpha/2) * sd.wd30.m[2]
+
+round( rbind( CI.wd30.mu, wald.wd30.mu, wald.wd30.mu.m, CI.wd30.rho, wald.wd30.rho, wald.wd30.rho.m,
+              mle.wd30 ), digits = 3 )
 ```
 
 The most appropriate distributions and their parameter estimates (plots) and associated uncertainties (values)
-```{r}
-par(mfrow=c(1,3))
+```{r, fig.width=10, fig.height=3}
+par(mfrow=c(1,4))
+
+temp1 <- paste("alpha == ", round(theta.hat.y$par[1], 4)) #
+temp2 <- paste("beta == ", round(theta.hat.y$par[2], 3)) #
+temp <- c(temp1, temp2)
+
+ppN <- ggplot(D)+
+  geom_histogram(aes(x = transformed.pow.obs.norm, y = ..density..), colour='white', alpha=0.6, bins=30)+
+  theme_bw()+
+  stat_function(aes(colour = "Normal Distribution"), fun = dnorm, n = dim(D)[1], args = list(mean = theta.hat.y$par[1], sd = theta.hat.y$par[2]))+
+  annotate( "text", x = 4/5*max(D$transformed.pow.obs.norm), y = c(0.11, 0.1), label = temp, parse = T  ) +
+  ggtitle("Power Production (Normalized and Transformed)")+
+  theme(legend.position = "top"
+        ,legend.background = element_rect(fill = "white", color = "black"))+
+  labs(colour = "")
 
 temp1 <- paste("alpha == ", round(mle.pow[1], 4)) #par.beta$par[1]
 temp2 <- paste("beta == ", round(mle.pow[2], 3)) #par.beta$par[2]
 temp <- c(temp1, temp2)
 
-pp <- ggplot(D)+
+ppB <- ggplot(D)+
   geom_histogram(aes(x = pow.obs.norm, y = ..density..), colour='white', alpha=0.6, bins=30)+
   theme_bw()+
-  stat_function(aes(colour = "Normal Distribution"), fun = dbeta, n = dim(D)[1], args = list(shape1 = mle.pow[1], shape2 = mle.pow[2]))+
+  stat_function(aes(colour = "Beta Distribution"), fun = dbeta, n = dim(D)[1], args = list(shape1 = mle.pow[1], shape2 = mle.pow[2]))+
   ylim(c(0,10))+
   annotate( "text", x = 4/5*max(D$pow.obs.norm), y = c(9.5, 9.0), label = temp, parse = T  ) +
-  ggtitle("Power Production (Normalized and Transformed)")+
+  ggtitle("Power Production (Normalized)")+
   theme(legend.position = "top"
         ,legend.background = element_rect(fill = "white", color = "black"))+
   labs(colour = "")
@@ -771,18 +840,26 @@ pd <- ggplot(D)+
         ,legend.background = element_rect(fill = "white", color = "black"))+
   labs(colour = "")
 
-grid.arrange(pp,ps,pd,nrow = 1)
+grid.arrange(ppN,ppB,ps,pd,nrow = 1)
 ```
 
 First are given the 95% likelihood based and Wald CIs of the parameters of the different models for the power, wind speed, and wind direction observations respetively. The maximum likelihood estimates are also given. Below can be seen the expected value along with the uncertainty thereof for the weibull model of the wind speed distribution. The expected value for the model of the power is not given as the data has been transformed. Further, the expected value for the wrapped cauchy model is not explicitly stated below as it is simply the location parameter $\mu$. These values can be found alongside the other parameters values below.
 
 ```{r}
 #All CIs of parameters
+round( rbind( wald.pow.mu, wald.pow.mu.m, wald.pow.sd, wald.pow.sd.m, theta.hat.y$par ), digits = 3 )#for norm dist of transformed pow obs.
+#they replace the beta dist below: CI.pow1 to mle.pow
+
 round( rbind( CI.pow1, wald.pow.shape1, CI.pow2, wald.pow.shape2, mle.pow,
               CI.ws30.shape, wald.ws30.shape, CI.ws30.scale, wald.ws30.scale, mle.ws30.weib, 
               CI.wd30.mu, wald.wd30.mu, CI.wd30.rho, wald.wd30.rho, mle.wd30 ), digits = 3 )
 
+round( rbind( wald.pow.shape1.m, wald.pow.shape2.m, wald.ws30.scale.m,
+              wald.ws30.shape.m, wald.wd30.mu.m, wald.wd30.rho.m ), digits = 3 ) #wald matrix
+
+
 round( rbind(CI.ws30.E, wald.ws30.E), digits=3);round( rbind(repar.E.ws30$par[2]), digits=3)
+wald.ws30.E.m #wald matrix
 ```
 
 ##### Expected values and uncertainty
