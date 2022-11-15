@@ -215,6 +215,13 @@ grid.arrange(fitplot,resplot, nrow = 1)
 ```{r}
 AIC(betaModel)
 AIC(ws.and.ws.squared)
+logLik(betaModel)
+g_inverse <- function(y,lambda){
+  return((1/(exp(y*lambda)+1))^(1/lambda) * exp(y))
+}
+#2*norm.lin.par$objective+2*4
+norm.lin.par$objective-sum(log(-1/(D$pow.obs.norm*(-1+D$pow.obs.norm^0.26))))
+#AIC(ws.and.ws.squared)-sum(log(-1/(D$pow.obs.norm*(-1*D$pow.obs.norm^0.26))))
 ```
 
 
