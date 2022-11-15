@@ -12,6 +12,8 @@ Setting working directories and loading the data. Data is also normalized.
 ```{r}
 library(ggplot2)
 library(numDeriv)
+library(betareg)
+library(gridExtra)
 
 if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
   setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
@@ -71,14 +73,18 @@ Two models will be produced: a non-normal beta or gamma regression model or the 
 First the non-normal:
 ```{r}
 #gamma's pretty bad. Maybe beta would be better?
-glmfit2 <- glm( (pow.obs.norm ~ I(ws30^2)), data = D, family = Gamma)
-summary(glmfit2)
-D$glmpred2 <- ( glmfit2$coefficients[1] + glmfit2$coefficients[2] * D$ws30^2)^(-1)
+gammaModel <- glm( (pow.obs.norm ~ ws30 + I(ws30^2)), data = D, family = Gamma)
+betaModel <- betareg(formula = (pow.obs.norm ~ ws30 + I(ws30^2)), data = D)
+D$gammaModel.pow <- gammaModel$fitted.values
+D$betaModel.pow <- betaModel$fitted.values
 
 ggplot(data = D)+
   geom_point(aes(x=ws30, y=pow.obs.norm, colour="Data"))+
-  geom_line(aes(x=ws30, y=glmpred2, colour="Model2"))+
-  labs(x = "Wind speeds", y="Norm power obs", colour = "")
+  geom_line(aes(x=ws30, y=gammaModel.pow, colour="Gamma"))+
+  geom_line(aes(x=ws30, y=betaModel.pow, colour="Beta"))+
+  labs(x = "Wind speeds", y="Norm power obs", colour = "")+
+  theme_bw()+
+  ggtitle("Models in standardised domain")
 ```
 This can also be done by hand. See p. 163-65 for reference. Exponential family regression models estimate the log-likelihood contribution of an outcome $y_i$ as seen below:
 $$
@@ -87,43 +93,68 @@ $$
 Here, $A(\theta_i)$ is defined as such that its derivative is the mean $E_{y_1}=A'(\theta_i)=\mu_i$. $\phi$ is the dispersion parameter, where $var(y_i)=\phi A''(\theta_i)=\phi v(\mu_i)$. To use this general exponential family for regression analysis we only have to specify $A(\theta_i)$ and a link function $h(\mu_i)$. The reason as to why $c(y_i,\phi)$ can be neglected is that the term disappears when determining the score function anyways.??? KOMMENTAR
 
 
-
 Now to the normal linear model:
 
 ```{r cars}
-transfit1 <- lm( (D$transformed.pow.obs.norm ~ ws30), data = D ) #good for comparison
-transfit12 <- lm( (D$transformed.pow.obs.norm ~ ws30 + I(ws30^2)), data = D) #brilliant
-transfit2 <- lm( (D$transformed.pow.obs.norm ~ I(ws30^2)), data = D ) #1. jeg har ladt disse to stå for at illustrere noget med residualerne
-transfit3 <- lm( (D$transformed.pow.obs.norm ~ I(ws30^3)), data = D ) #2. 
+ws.only <- lm( (D$transformed.pow.obs.norm ~ ws30), data = D ) #good for comparison transfit1
+ws.and.ws.squared <- lm( (D$transformed.pow.obs.norm ~ ws30 + I(ws30^2)), data = D) #brilliant transfit12
+ws.squared.only <- lm( (D$transformed.pow.obs.norm ~ I(ws30^2)), data = D ) #1. jeg har ladt disse to stå for at illustrere transfit2 noget med residualerne
+ws.ws2.and.wd <- lm( (D$transformed.pow.obs.norm ~ ws30 + I(ws30^3) + cos(wd30)), data = D ) #2. 
+summary(ws.ws2.and.wd)
 #transfitS <- lm( (D$transformed.pow.obs.norm ~ ws30 + I(ws30^2) + Season), data = D )
-summary(transfit1)
-summary(transfit12)
+#summary(ws.only)
+#summary(ws.and.ws.squared)
 
-D$transformed.pred1 <- transfit1$coefficients[1] + transfit1$coefficients[2] * D$ws30
-D$transformed.pred12 <- transfit12$coefficients[1] + transfit12$coefficients[2] * D$ws30 + transfit12$coefficients[3] * D$ws30^2
+D$ws.pred <- ws.only$coefficients[1] + ws.only$coefficients[2] * D$ws30
+D$ws.ws2.pred <- ws.and.ws.squared$coefficients[1] + ws.and.ws.squared$coefficients[2] * D$ws30 + ws.and.ws.squared$coefficients[3] * D$ws30^2
+D$ws.ws2.wd.pred <- ws.ws2.and.wd$coefficients[1] + ws.ws2.and.wd$coefficients[2] * D$ws30 + 
+  ws.ws2.and.wd$coefficients[3] * D$ws30^2 + ws.ws2.and.wd$coefficients[4] * cos(D$wd30)
 
 #D$transformed.predS <- transfitS$coefficients[1] + transfitS$coefficients[2] * D$ws30 + transfitS$coefficients[3] * D$ws30^2 + transfitS$coefficients[4] * D$Season
 #summary(transfitS)
 
 ggplot(data = D)+
-  geom_point(aes(x=ws30, y=transformed.pow.obs.norm, colour="Data"))+
-  geom_line(aes(x=ws30, y=transformed.pred1, colour="Model1"))+
-  geom_line(aes(x=ws30, y=transformed.pred12, colour="Model12"))+
-  #geom_line(aes(x=ws30, y=transformed.predS, colour="ModelS"))+
-  labs(x = "Wind speeds", y="Transformed, norm power obs", colour = "")
-
+  geom_point(aes(x=ws30, y=transformed.pow.obs.norm, colour="Data"), size = 4, alpha = 0.6)+
+  geom_line(aes(x=ws30, y=ws.pred, colour="ws only"))+
+  geom_line(aes(x=ws30, y=ws.ws2.pred, colour="ws + ws^2"))+
+  scale_colour_manual(values = c("red", "blue", "orange"))+
+  #geom_line(aes(x=ws30, y=ws.ws2.wd.pred, colour="ws + ws^2 + cos(wd)"))+
+  labs(x = "Wind speeds", y="Transformed, norm power obs", colour = "")+
+  theme_bw()+
+  ggtitle("Fitted models in Transformed Domain")
 
 summary(lm( (D$transformed.pow.obs.norm ~ ws30 + I(ws30^2) + wd30), data = D)) #simply a check with the final model to make sure that wd still is irrelevant as regressor
 ```
+```{r}
+#Outcommented so it is possible to create a PDF
+# library(plotly)
+# 
+# fig <- plot_ly(mtcars, x = D$ws30, y = cos(D$wd30), z = D$transformed.pow.obs.norm
+#                , color = "Observed Power Production (Normalised)", colors = "red")
+# fig <- fig %>% add_markers()
+# fig <- fig %>% layout(scene = list(xaxis = list(title = 'Pos.Obs'),
+#                                    yaxis = list(title = 'cos(WD)'),
+#                                    zaxis = list(title = 'WS')))
+# add_trace(type = 'mesh3d',
+#           p = fig,
+#           x = D$ws30,
+#           y = cos(D$wd30),
+#           z = D$ws.ws2.wd.pred,
+#           facecolor = rep("blue", length(D$ws30)),
+#           opacity = 0.1
+# )
+```
+
+Tror ikke at det giver mening at have wind direction med, det ligner ikke rigtig at det giver så meget? Men AIC er dog bedre... Ligeledes er det også statistisk signifikant, hvis man tilføjer måned på året.  
 
 Tjek af modellerne:
 
-```{r pressure, echo=FALSE, fig.height = 8, fig.width = 8}
+```{r pressure, echo=FALSE, fig.height = 6, fig.width = 6}
 par(mfrow=c(2,2))
-plot(D$ws30, transfit1$residuals)
-plot(D$ws30, transfit2$residuals)
-plot(D$ws30, transfit3$residuals)
-plot(D$ws30, transfit12$residuals)
+plot(D$ws30, ws.only$residuals, main = "ws only")
+plot(D$ws30, ws.squared.only$residuals, main = "ws^2 only")
+plot(D$ws30, ws.ws2.and.wd$residuals, main = "ws, ws^2 and wd")
+plot(D$ws30, ws.and.ws.squared$residuals, main = "ws + ws^2")
 ```
 
 Normal linear model by hand and by optimisation:
@@ -140,10 +171,10 @@ NLL.norm.lin <- function(p, regr1, regr2, response){
 }
 norm.lin.par <- nlminb(c(1,1,1), objective = NLL.norm.lin, regr1 = D$ws30, regr2 = D$ws30^2, response = Y)
 
-round( rbind(transfit12$coefficients,betas[1:3],norm.lin.par$par), digits=6)
+round( rbind(ws.and.ws.squared$coefficients,betas[1:3],norm.lin.par$par), digits=6)
 ```
-```{r}
-y_p <- D$transformed.pred12
+```{r, fig.width=9, fig.height=3}
+y_p <- D$ws.ws2.pred
 #y_pS <- D$transformed.predS
 D$y_inv_trans <- 1/( exp(y_p*lambda)+1 )^(1/lambda) * exp(y_p)
 #D$Season_inv_trans <- 1/( exp(y_pS*lambda)+1 )^(1/lambda) * exp(y_pS)
@@ -151,19 +182,42 @@ D$y_inv_trans <- 1/( exp(y_p*lambda)+1 )^(1/lambda) * exp(y_p)
 #D$Season <- 0
 #D$Season[D$month > 5] <- 1
 
-ggplot(data = D)+
-  geom_point(aes(x=ws30, y=pow.obs.norm))+
-  geom_line(aes(x=ws30, y=y_inv_trans, colour="Inv"))+
+fitplot <- ggplot(data = D)+
+  geom_point(aes(x=ws30, y=pow.obs.norm, colour = "Observed power production (Transformed)"), size = 4, alpha = 0.6)+
+  geom_line(aes(x=ws30, y=y_inv_trans, colour="Inverse Transformation of the Normal model"), size = 2)+
+  geom_line(aes(x=ws30, y=betaModel.pow, colour="The directly fitted beta model"), size = 2)+
   #geom_line(aes(x=ws30, y=Season_inv_trans, colour="InvS"))+
   labs(x = "Wind speeds", y="Norm power obs", colour = "")+
-  theme_bw()
-  #scale_shape_manual(values = c(1:10))+
-  #scale_colour_manual(values = c("blue", "yellow", "black"))
+  theme_bw()+
+  labs(colour = "")+
+  ggtitle("Model fits")+
+  theme(legend.background = element_rect(colour = "black"), legend.position = "top")+
+  scale_colour_manual(values = c("orange", "red", "blue"))
+#scale_shape_manual(values = c(1:10))+
+#scale_colour_manual(values = c("blue", "yellow", "black"))
 
-plot(D$ws30, D$pow.obs.norm-D$y_inv_trans)
-abline(h=0)
+resplot <- ggplot(data = D)+
+  geom_point(aes(x = ws30, y = pow.obs.norm - y_inv_trans, colour = "Normal model residuals"), size = 3, alpha = 0.5)+
+  geom_point(aes(x = ws30, y = pow.obs.norm - betaModel.pow, colour = "Beta model residuals"), size = 3, alpha = 0.5)+
+  theme_bw()+
+  scale_colour_manual(values = c("blue", "orange"))+
+  ggtitle("Model Residuals Comparison")+
+  labs(colour = "")+
+  theme(legend.position = "top", legend.background = element_rect(colour = "black"))
+
+grid.arrange(fitplot,resplot, nrow = 1)
+
+#plot(D$ws30, D$pow.obs.norm-D$y_inv_trans)
+#abline(h=0)
 
 ```
+
+```{r}
+AIC(betaModel)
+AIC(ws.and.ws.squared)
+```
+
+
 Uncertainties of parameters (in transformed domain)
 ```{r}
 norm.lin.sds <- sqrt(diag(solve(hessian( func = NLL.norm.lin, x = norm.lin.par$par, regr1 = D$ws30, regr2 = D$ws30^2, response = D$transformed.pow.obs.norm ))))
@@ -173,11 +227,11 @@ Wald.CI.lower <- norm.lin.par$par - qnorm(0.975) * norm.lin.sds
 cat("beta_0 = ", norm.lin.par$par[1], "95% CI [",Wald.CI.lower[1],", ",Wald.CI.upper[1],"]"
     ,"\nbeta_1 = ", norm.lin.par$par[2], "95% CI [",Wald.CI.lower[2],", ",Wald.CI.upper[2],"]"
     ,"\nbeta_2 = ", norm.lin.par$par[3], "95% CI [",Wald.CI.lower[3],", ",Wald.CI.upper[3],"]"
-    )
+)
 
 #Test regularity
 score.nll.norm <- function(theta, regr1, regr2, response, sigma){
-
+  
   beta0 <- theta[1]
   beta1 <- theta[2]
   beta2 <- theta[3]
@@ -221,8 +275,8 @@ grid()
 
 Interpretation of parameters 
 ```{r}
-transfit12$coefficients
-beta_0 <- transfit12$coefficients[1]
+ws.and.ws.squared$coefficients
+beta_0 <- ws.and.ws.squared$coefficients[1]
 ( offset_inv <- 1/( exp(beta_0*lambda)+1 )^(1/lambda) * exp(beta_0) )
 ```
 The regression model used is a normal model with data transformation. The first parameter is the intercept with the y-axis and can be transformed back to the original domain yielding an offset value of 0.00035. This is as expected since there should be no power production at 0 wind speed.
