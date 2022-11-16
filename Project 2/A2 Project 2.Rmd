@@ -171,10 +171,10 @@ Run the LRT (assuming regularity of the likelihoods (*page 36*)):
 
 ```{r}
 chi.squared <- - 2 * (log.reg$objective - log.reg.no.effect$objective)
-p.value <- 1 - pchisq(chi.squared, df = 1)
+p.value.LRT <- 1 - pchisq(chi.squared, df = 1)
 
 cat("The log ratio chi-square test statistic = ",chi.squared,
-    "\np-value = ", p.value,
+    "\np-value = ", p.value.LRT,
     "\n\nThe log-ratio test show that the effect of the treatment is significant on a significance level of alpha = 0.05.")
 ```
 
@@ -192,6 +192,43 @@ cat("The wald test statistic = ",waldTestStatistic,
 ```
 
 #### The score test
+
+##From blackboard on 15/11
+$$
+\begin{split}
+S_1 &= Y_1-\frac{m_1\cdot e^{\beta_0+\beta_1}}{1+e^{\beta_0+\beta_1}}+Y_2-\frac{m_2\cdot e^{\beta_0}}{1+e^{\beta_0}}\\
+S_2 &= Y_1-\frac{m_1\cdot e^{\beta_0+\beta_1}}{1+e^{\beta_0+\beta_1}}
+\end{split}\\
+S=[S_1,S_2]^T
+$$
+Where $Y_1$ are events in treatment group and $Y_2$ are events in control group. And then $m_1$ are persons in treatment group and $m_2$ persons in control group. HOWEVER, as this is the score test, it is important to note that $\beta_1$ will not be set equal to the $\beta_1=-0.72$ from earlier but instead $\beta_{1,H_0}=0$ under our null hypothesis.
+
+```{r}
+Y_1 <- as.numeric(log.data$AIDS_yes[log.data$AZT=='Yes'])
+Y_2 <- as.numeric(log.data$AIDS_yes[log.data$AZT=='No'])
+m_1 <- as.numeric(log.data$n[log.data$AZT=='Yes'])
+m_2 <- as.numeric(log.data$n[log.data$AZT=='No'])
+beta0_score <- log.reg.no.effect$par #estimated is beta0, log.reg$par[1] for the model with treatment parameter included
+beta1_score = 0 #estimated is beta1, log.reg$par[2]
+P_1 <- exp(beta0_score+beta1_score) / (1+exp(beta0_score+beta1_score))
+P_2 <- exp(beta0_score) / (1+exp(beta0_score))
+
+S_1 <- Y_1 - m_1*P_1 + Y_2 - m_2*P_2
+S_2 <- Y_1 - m_1*P_1
+S <- c(S_1, S_2)
+
+
+V_S_vect <- c(m_1*P_1*(1-P_1)+m_2*P_2*(1-P_2), m_1*P_1*(1-P_1)+0, m_1*P_1*(1-P_1)+0, m_1*P_1*(1-P_1))
+V_S <- matrix(c(V_S_vect), nrow = 2, ncol = 2)
+
+chi.squared.Score <- t(S)%*%solve(V_S)%*%S
+(1 - pchisq(chi.squared.Score, df = 1))
+p.value.Score <- as.numeric(1 - pchisq(chi.squared.Score, df = 1))
+
+rbind(p.value.LRT, wald.p.value, p.value.Score)
+```
+
+
 
 Calculating the score function for the logistic regression model. 
 $$

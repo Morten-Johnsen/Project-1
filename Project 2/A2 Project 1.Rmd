@@ -214,18 +214,32 @@ grid.arrange(fitplot,resplot, nrow = 1)
 
 ```{r}
 AIC(betaModel)
-AIC(ws.and.ws.squared)
-logLik(betaModel)
+AIC(ws.and.ws.squared) #hmm, der er jo noget, som ikke passer her
 g_inverse <- function(y,lambda){
   return((1/(exp(y*lambda)+1))^(1/lambda) * exp(y))
 }
 #2*norm.lin.par$objective+2*4
-norm.lin.par$objective-sum(log(-1/(D$pow.obs.norm*(-1+D$pow.obs.norm^0.26))))
-#AIC(ws.and.ws.squared)-sum(log(-1/(D$pow.obs.norm*(-1*D$pow.obs.norm^0.26))))
+logLik(betaModel)#compare this to the one below
+-norm.lin.par$objective+sum(log(-1/(D$pow.obs.norm*(-1+D$pow.obs.norm^0.26)))) #actual log-likelihood. It's greater than that of the beta model. This corresponds to the figure above :))
+AIC.bm <- -2*logLik(betaModel)+2*( length(betaModel$coefficients$mean) + length(betaModel$coefficients$precision) )
+AIC.normTrans <- 2*(norm.lin.par$objective-sum(log(-1/(D$pow.obs.norm*(-1+D$pow.obs.norm^0.26))))) + 2*length(norm.lin.par$par) #aha, så passer det jo :)
+round(rbind(AIC.bm,AIC.normTrans),digits=4)
 ```
+Important to note that the NEGATIVE log-likelihood of the function is given by:
+$$
+\mathcal{L}(y) = -\sum_{i=1}^n log\left(f_y(y)\dfrac{-1}{g^{-1}(y)(-1+g^{-1}(y)^\lambda)}\right)
+$$
+Where $f_y(y)$ is the likelihood given the by fit (the \$objective in the above). Thus, we need to account for the likelihood contribution by the transformation to determine the actual likelihood $\mathcal{L}(y)$. Notice that:
+$$
+\mathcal{L}(y) = -\sum_{i=1}^n logf_y(y) -\sum_{i=1}^nlog\left(\dfrac{-1}{g^{-1}(y)(-1+g^{-1}(y)^\lambda)}\right)
+$$
+And as such the likelihood is simply:
+$$
+l(y) = \sum_{i=1}^n logf_y(y) +\sum_{i=1}^nlog\left(\dfrac{-1}{g^{-1}(y)(-1+g^{-1}(y)^\lambda)}\right)
+$$
+Which corresponds to the calculation above.
 
-
-Uncertainties of parameters (in transformed domain)
+##Uncertainties of parameters (in transformed domain)
 ```{r}
 norm.lin.sds <- sqrt(diag(solve(hessian( func = NLL.norm.lin, x = norm.lin.par$par, regr1 = D$ws30, regr2 = D$ws30^2, response = D$transformed.pow.obs.norm ))))
 Wald.CI.upper <- norm.lin.par$par + qnorm(0.975) * norm.lin.sds
