@@ -264,11 +264,11 @@ L(y) = \prod_{i=1}^n f_x(x_i) = f_y(y_i) \dfrac{-1}{x_i(-1+x_i^\lambda)} = \prod
 $$
 Calculating the negative log-likelihood we get:
 $$
-\mathcal{L}(y) = -\sum_{i=1}^n log\left(f_y(y_i)\dfrac{-1}{g^{-1}(y_i)(-1+g^{-1}(y_i)^\lambda)}\right)= -\sum_{i=1}^n \left( log(f_y(y_i)) + log\left(\dfrac{-1}{g^{-1}(y_i)(-1+g^{-1}(y_i)^\lambda)} \right) \right)
+-\mathcal{L}(y) = -\sum_{i=1}^n log\left(f_y(y_i)\dfrac{-1}{g^{-1}(y_i)(-1+g^{-1}(y_i)^\lambda)}\right)= -\sum_{i=1}^n \left( log(f_y(y_i)) + log\left(\dfrac{-1}{g^{-1}(y_i)(-1+g^{-1}(y_i)^\lambda)} \right) \right)
 $$
 
 $$
-\Longrightarrow \mathcal{L(y)} = -\sum_{i=1}^n log(f_y(y_i))-\sum_{i=1}^n log \left( \dfrac{-1}{g^{-1}(y_i)(-1+g^{-1}(y_i)^\lambda)} \right)
+\Longrightarrow -\mathcal{L(y)} = -\sum_{i=1}^n log(f_y(y_i))-\sum_{i=1}^n log \left( \dfrac{-1}{g^{-1}(y_i)(-1+g^{-1}(y_i)^\lambda)} \right)
 $$
 Where $f_y(y)$ is the normal distribution pdf with mean=$\mu$ and variance=$\sigma^2$). 
 
