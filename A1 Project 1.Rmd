@@ -737,6 +737,7 @@ Es <- seq(8, 10.4, by = 0.001)
 ws30.E <- sapply(X = Es, FUN = repar.ws30.fun, shape = repar.E.ws30$par[1], data = D$ws30)
 plot(Es, ws30.E/max(ws30.E), col = 1, type = "l", xlab = expression(paste("Expected value E[x] or ", theta)),
      main = "Expected value for weibull model of wind speed")
+grid()
 pf.CI.ws30.E <- c(uniroot(f = CIfun.repar.ws30, interval = c(min(Es), repar.E.ws30$par[2]), data = D$ws30, mles = repar.E.ws30$par)$root,
                uniroot(f = CIfun.repar.ws30, interval = c(repar.E.ws30$par[2], max(Es)), data = D$ws30, mles = repar.E.ws30$par)$root)
 lines(range(Es), c*c(1,1), col = 2)
@@ -772,7 +773,7 @@ round( t(data.frame(pf.CI.ws30.E, wald.ws30.E, wald.ws30.E.hessian.matrix.based,
 
 Parameter estimates and uncertainties.
 
-```{r}
+```{r,warning=F, fig.width=16, fig.height=6}
 ## CI ## WIND DIRECTION
 par(mfrow=c(1,2))
 #likelihood-based
@@ -805,7 +806,8 @@ mus <- seq(-2.5, -1, by = 0.01)
 wd30.mu <- sapply(X = mus, FUN = wd30.fun, rho = mle.wd30[2], data = D$wd30)
 plot(mus, wd30.mu/max(wd30.mu), col = 1, type = "l", xlab = expression(paste("peak, ", mu)),
      main = "Parameter value for peak for wrapped cauchy model of wind direction")
-CI.wd30.mu <- c(uniroot(f = CIfun.wd30, interval = c(-2.5, mle.wd30[1]), mu = T)$root,
+grid()
+pf.CI.wd30.mu <- c(uniroot(f = CIfun.wd30, interval = c(-2.5, mle.wd30[1]), mu = T)$root,
                 uniroot(f = CIfun.wd30, interval = c(mle.wd30[1], -1), mu = T)$root)
 lines(range(mus), c*c(1,1), col = 2)
 
@@ -813,7 +815,8 @@ rhos <- seq(0, 0.5, by = 0.005)
 wd30.rho <- sapply(X = rhos, FUN = wd30.fun, mu = mle.wd30[1], data = D$wd30)
 plot(rhos, wd30.rho/max(wd30.rho), col = 1, type = "l", xlab = expression(paste("concentration, ", rho)),
      main = "Parameter value for concentration factor for wrapped cauchy model of wind direction")
-CI.wd30.rho <- c(uniroot(f = CIfun.wd30, interval = c(0, mle.wd30[2]), mu = F)$root,
+grid()
+pf.CI.wd30.rho <- c(uniroot(f = CIfun.wd30, interval = c(0, mle.wd30[2]), mu = F)$root,
                    uniroot(f = CIfun.wd30, interval = c(mle.wd30[2], 0.5), mu = F)$root)
 lines(range(rhos), c*c(1,1), col = 2)
 
@@ -827,17 +830,26 @@ wald.wd30.mu <- mle.wd30[1] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.wd30.mu)
 wald.wd30.rho <- mle.wd30[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.wd30.rho)
 
 #wald m. matrix
-H.wd30.m <- hessian(func = nl.wd30.funp, x = wrapped.cauc.par$par,  data = D$wd30)
-sd.wd30.m <- sqrt(diag(solve(H.wd30.m)))
-wald.wd30.mu.m <- wrapped.cauc.par$par[1] + c(-1,1) * qnorm(1-alpha/2) * sd.wd30.m[1]
-wald.wd30.rho.m <- wrapped.cauc.par$par[2] + c(-1,1) * qnorm(1-alpha/2) * sd.wd30.m[2]
-
-round( rbind( CI.wd30.mu, wald.wd30.mu, wald.wd30.mu.m, CI.wd30.rho, wald.wd30.rho, wald.wd30.rho.m,
-              mle.wd30 ), digits = 3 )
+H.wd30.hessian.matrix.based <- hessian(func = nl.wd30.funp, x = wrapped.cauc.par$par,  data = D$wd30)
+sd.wd30.hessian.matrix.based <- sqrt(diag(solve(H.wd30.hessian.matrix.based)))
+wald.wd30.mu.hessian.matrix.based <- wrapped.cauc.par$par[1] + c(-1,1) * qnorm(1-alpha/2) * sd.wd30.hessian.matrix.based[1]
+wald.wd30.rho.hessian.matrix.based <- wrapped.cauc.par$par[2] + c(-1,1) * qnorm(1-alpha/2) * sd.wd30.hessian.matrix.based[2]
 ```
 
+```{r}
+cat("MLE: (shape; scale) = (",round(mle.wd30[1],3),"; ",round(mle.wd30[2],3),")\n\n\n")
+
+round( t(data.frame( pf.CI.wd30.mu
+                   , wald.wd30.mu
+                   , wald.wd30.mu.hessian.matrix.based
+                   , pf.CI.wd30.rho
+                   , wald.wd30.rho
+                   , wald.wd30.rho.hessian.matrix.based, row.names = c("LOWER [95%]", "UPPER [95%]"))), digits = 3 )
+```
+
+
 The most appropriate distributions and their parameter estimates (plots) and associated uncertainties (values)
-```{r, fig.width=10, fig.height=3}
+```{r, fig.width=16, fig.height=6, warning = F}
 par(mfrow=c(1,4))
 
 temp1 <- paste("alpha == ", round(theta.hat.y$par[1], 4)) #
@@ -845,11 +857,13 @@ temp2 <- paste("beta == ", round(theta.hat.y$par[2], 3)) #
 temp <- c(temp1, temp2)
 
 ppN <- ggplot(D)+
-  geom_histogram(aes(x = transformed.pow.obs.norm, y = ..density..), colour='white', alpha=0.6, bins=30)+
+  geom_histogram(aes(x = transformed.pow.obs.norm, y = ..density..), colour='white', alpha=0.6, bins=30, fill = "red")+
   theme_bw()+
   stat_function(aes(colour = "Normal Distribution"), fun = dnorm, n = dim(D)[1], args = list(mean = theta.hat.y$par[1], sd = theta.hat.y$par[2]))+
   annotate( "text", x = 4/5*max(D$transformed.pow.obs.norm), y = c(0.11, 0.1), label = temp, parse = T  ) +
-  ggtitle("Power Production (Normalized and Transformed)")+
+  scale_colour_manual(values = "black")+
+  ggtitle("Power Production (Normal Transformed)")+
+  labs(x = "Power Production [Transformed domain]")+
   theme(legend.position = "top"
         ,legend.background = element_rect(fill = "white", color = "black"))+
   labs(colour = "")
@@ -859,12 +873,14 @@ temp2 <- paste("beta == ", round(mle.pow[2], 3)) #par.beta$par[2]
 temp <- c(temp1, temp2)
 
 ppB <- ggplot(D)+
-  geom_histogram(aes(x = pow.obs.norm, y = ..density..), colour='white', alpha=0.6, bins=30)+
+  geom_histogram(aes(x = pow.obs.norm, y = ..density..), colour='white', alpha=0.6, bins=30, fill = "red")+
   theme_bw()+
   stat_function(aes(colour = "Beta Distribution"), fun = dbeta, n = dim(D)[1], args = list(shape1 = mle.pow[1], shape2 = mle.pow[2]))+
-  ylim(c(0,10))+
-  annotate( "text", x = 4/5*max(D$pow.obs.norm), y = c(9.5, 9.0), label = temp, parse = T  ) +
+  ylim(c(0,5))+
+  annotate( "text", x = 4/5*max(D$pow.obs.norm), y = c(4.5, 4.1), label = temp, parse = T  ) +
+  scale_colour_manual(values = "black")+
   ggtitle("Power Production (Normalized)")+
+  labs(x = "1/5000 Power production [kW]")+
   theme(legend.position = "top"
         ,legend.background = element_rect(fill = "white", color = "black"))+
   labs(colour = "")
@@ -874,11 +890,13 @@ temp2 <- paste("lambda == ", round(mle.ws30.weib[2],3)) #par.ws30$par[2]
 temp <- c(temp1, temp2)
 
 ps <- ggplot(D)+
-  geom_histogram(aes(x = ws30, y = ..count../sum(..count..)) , colour = "white", alpha=0.6, bins = 30)+
+  geom_histogram(aes(x = ws30, y = ..count../sum(..count..)) , colour = "white", alpha=0.6, bins = 30, fill = "black")+
   theme_bw()+
   stat_function(aes(colour = "Weibull Distribution"), fun = dweibull, n = dim(D)[1], args = list(shape = par.ws30$par[1], scale = par.ws30$par[2])) +
-  annotate( "text", x = 4/5*max(D$ws30), y = c(0.09,0.085), label = temp, parse = T  ) +
+  annotate( "text", x = 4/5*max(D$ws30), y = c(0.09,0.082), label = temp, parse = T  ) +
+  scale_colour_manual(values = "black")+
   ggtitle("Wind Speed")+
+  labs(x = "Wind speed [m/s]")+
   theme(legend.position = "top"
         ,legend.background = element_rect(fill = "white", color = "black"))+
   labs(colour = "")
@@ -889,12 +907,14 @@ temp <- c(temp1, temp2)
 
 pd <- ggplot(D)+
   theme_bw()+
-  geom_histogram(aes(x = wd30, y = ..density..), colour = "white", alpha = 0.6, bins = 20)+
+  geom_histogram(aes(x = wd30, y = ..density..), colour = "white", alpha = 0.6, bins = 20, fill = "orange")+
   scale_x_continuous(breaks = c(0,pi/2,pi,3/2*pi,2*pi)
                      , labels =c("0", "pi/2", "pi", "3/2pi", "2pi"))+
   stat_function(aes(colour = "Wrapped Cauchy"), fun = dwrappedcauchy, n = dim(D)[1], args = list(mu = wrapped.cauc.par$par[1], rho = 0.36))+
   annotate( "text", x = 1/5*max(D$wd30), y = c(0.35, 0.325), label = c(temp1,temp2), parse = T  ) +
+  scale_colour_manual(values = "black")+
   ggtitle("Wind direction")+
+  labs(x = "Wind direction [Radians]")+
   theme(legend.position = "top"
         ,legend.background = element_rect(fill = "white", color = "black"))+
   labs(colour = "")
@@ -905,7 +925,7 @@ grid.arrange(ppN,ppB,ps,pd,nrow = 1)
 First are given the 95% likelihood based and Wald CIs of the parameters of the different models for the power, wind speed, and wind direction observations respetively. The maximum likelihood estimates are also given. Below can be seen the expected value along with the uncertainty thereof for the weibull model of the wind speed distribution. The expected value for the model of the power is not given as the data has been transformed. Further, the expected value for the wrapped cauchy model is not explicitly stated below as it is simply the location parameter $\mu$. These values can be found alongside the other parameters values below.
 
 ```{r}
-#All CIs of parameters
+#All CIs of parameters (Findes i bedre format længere oppe.)
 round( rbind( wald.pow.mu, wald.pow.mu.m, wald.pow.sd, wald.pow.sd.m, theta.hat.y$par ), digits = 3 )#for norm dist of transformed pow obs.
 #they replace the beta dist below: CI.pow1 to mle.pow
 
@@ -923,13 +943,23 @@ wald.ws30.E.m #wald matrix
 
 ##### Expected values and uncertainty
 
+**Beta**
+
+Beta er ikke nødvendigvis relevant, da vi senere vælger at køre med normal-transformationen
+
 ```{r}
 alpha <- par.beta$par[1]; beta <- par.beta$par[2]
 #Beta: E[X] = alpha/(alpha + beta), Var[X] = alpha*beta/((alpha+beta)^2*(alpha+beta+1))
 E.pow.obs <- alpha/(alpha + beta)
 CI.E.pow.obs <- alpha/(alpha + beta) + c(-1,1) * qnorm(1-alpha/2) * alpha*beta/((alpha+beta)^2*(alpha+beta+1)) * 1/dim(D)[1]
 #(CI.E.pow.obs <- mean(D$pow.obs.norm) + c(-1,1) * qnorm(1-alpha/2) * sd(D$pow.obs.norm) / dim(D)[1])
+cat("E[X] =", E.pow.obs, " 95% CI: ", CI.E.pow.obs)
+```
 
+
+**Weibull**
+
+```{r}
 #Weibull: E[X] = lambda * gamma(1+1/k); Var[X] = lambda^2*(gamma(1+2/k) - (gamma(1+1/k))^2)
 #par.ws30$par[2]*gamma(1+1/par.ws30$par[1]) #mean = lambda * Gamma(1 + 1/k); lambda = scale, k = shape
 scale <- par.ws30$par[2]; shape <- par.ws30$par[1]
@@ -938,14 +968,21 @@ V.ws30 <- scale^2*(gamma(1+2/shape) - (gamma(1+1/shape))^2)
 CI.E.ws30 <- E.ws30 + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30) / dim(D)[1] #according to Central Limit Theorem
 #(CI.E.ws30 <- mean(D$ws30) + c(-1,1) * qnorm(1-alpha/2) * sd(D$ws30) / dim(D)[1])
 
+cat("E[X] =", E.ws30, " 95% CI: ", CI.E.ws30)
+```
+
+**Wrapped Cauchy**
+
+```{r}
 #Wrapped Cauchy: E[X] = mu, Var[X] = 1 - exp(-gamma)
 #relationship between rho and gamma: gamma = -ln(rho)
 mu <- wrapped.cauc.par$par[1]; gamma = -log(wrapped.cauc.par$par[2])
-(E.wd30 <- mu)
-(V.wd30 <- 1 - exp(-gamma)) #or 1 - rho
-(CI.E.wd30 <- E.wd30 + c(-1,1) * qnorm(1-alpha/2) *V.wd30 / dim(D)[1]) #according to Central Limit Theorem
+E.wd30 <- mu
+V.wd30 <- 1 - exp(-gamma) #or 1 - rho
+CI.E.wd30 <- E.wd30 + c(-1,1) * qnorm(1-alpha/2) * V.wd30 / dim(D)[1] #according to Central Limit Theorem
 #(CI.E.wd30 <- mle.wd30[1] + c(-1,1) * qnorm(1-alpha/2) * sd(D$wd30) / dim(D)[1]) #mean(D$wd30) instead gives another result
-round(rbind(c(CI.E.pow.obs[1], 1/par.exp$par, CI.E.pow.obs[2]) , c(CI.E.ws30[1], E.ws30, CI.E.ws30[2]) , c(CI.E.wd30[1], mle.wd30[1], CI.E.wd30[2])), digits=5)
+
+cat("E[X] =", E.wd30, " 95% CI: ", CI.E.wd30)
 ```
 
 
