@@ -225,42 +225,10 @@ chi.squared.Score <- t(S)%*%solve(V_S)%*%S
 (1 - pchisq(chi.squared.Score, df = 1))
 p.value.Score <- as.numeric(1 - pchisq(chi.squared.Score, df = 1))
 
-rbind(p.value.LRT, wald.p.value, p.value.Score)
-```
-
-
-
-Calculating the score function for the logistic regression model. 
-$$
-S(\theta) = \dfrac{1}{\theta} \sum_i y_i + \dfrac{1}{1+\theta} \sum_i 1-y_i
-$$
-
-```{r}
-#Page 259
-
-p <- function(beta,x){
-  x <- rbind(1,x)
-  out <- exp(beta %*% x)/(1 + exp(beta %*% x))
-  return(as.numeric(out))
-}
-
-y <- c(rep(c(1,0),c(log.data$AIDS_yes[1], log.data$n[1]-log.data$AIDS_yes[1]))
-       ,rep(c(1,0),c(log.data$AIDS_yes[2], log.data$n[2]-log.data$AIDS_yes[2])))
-treatment <- rep(c(1,0), c(log.data$n[1],log.data$n[2]))
-
-theta <- p(c(log.reg.no.effect$par,0), treatment)
-
-score <- function(theta,treatment,y){
-  score <- sum((y - theta)*treatment)
-  return(score)
-}
-
-information <- function(theta,treatment,y){
-  info <- sum(theta * (1 - theta) * treatment^2)
-  return(info)
-}
-
-2*pnorm(score(theta,treatment,y) / sqrt(information(theta,treatment,y)))
+comp.table <- rbind("Log ratio test" = c(p.value.LRT, "Show that the addition of the treatment effect (beta1) is significant.")
+                    , "Wald test" = c(wald.p.value,"Show that the addition of the treatment effect (beta1) is significant.")
+                    , "Score test" = c(p.value.Score, "Show that the two treatment groups cannot be treated as being just one group")); colnames(comp.table) <- c("p-value", "interpretation")
+comp.table
 ```
 
 The score test show that the null hypothesis stating $H_0$: $\theta = \theta_0$ - where $\theta_0$ is the population average - can be rejected on a significance level of $\alpha = 0.05$, thus showing that there's a difference in the risk of developing AIDS between the two treatment groups. This conclusion aligns with the results from the Wald test and the Log-Ratio Test. If the score test had shown that the p-value was above the $\alpha$ level, then it would have shown no difference between the $\theta_0$ and the actual MLE $\theta$. The intuitive interpretation of the Score test is that: *if the restricted estimator ($\theta_0$/the population level probability of the given event) is near the true MLE, then the score value $S(\theta_0)$, should not differ from 0 by more than $\approx$ 2 times the sample standard deviation.
