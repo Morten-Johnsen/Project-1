@@ -220,7 +220,8 @@ g_inverse <- function(y,lambda){
 #Extract log likelihood for the beta model:
 logLik_betaModel <- logLik(betaModel)#compare this to the one below
 #The actual log-likelihood of the normal-transformed model can be calculated based on our transformation and change-of-variable in assignment 1
-#here, the log likelihood L(y) consists of two terms: -sum(log(f(y))) and -sum(log(dg/dx)). Thus -log(f(y)) = L(y) + log(dg/dx) and now the
+#here, the negative log likelihood -L(y) consists of two terms: -sum(log(f(y))) and -sum(log(dg/dx)). The fit given by the objective function
+#is -log(f(y)) and thus the log-likelihood can be calculated as L(y) = sum(log(f(y))) + log(dg/dx) and now the
 #likelihoods from the two different models (beta and normal) can be compared:
 logLik.normTrans <- -norm.lin.par$objective+sum(log(-1/(D$pow.obs.norm*(-1+D$pow.obs.norm^0.26)))) #actual log-likelihood. It's greater than that of the beta model. This corresponds to the figure above :))
 AIC.bm <- -2*logLik_betaModel+2*( length(betaModel$coefficients$mean) + length(betaModel$coefficients$precision) )
@@ -234,11 +235,11 @@ $$
 $$
 Where $f_y(y)$ is the likelihood given the by fit (the \$objective in the above). Thus, we need to account for the likelihood contribution by the transformation to determine the actual likelihood $\mathcal{L}(y)$. Notice that:
 $$
-\mathcal{L}(y) = -\sum_{i=1}^n logf_y(y) -\sum_{i=1}^nlog\left(\dfrac{-1}{g^{-1}(y)(-1+g^{-1}(y)^\lambda)}\right)
+-\mathcal{L}(y) = -\sum_{i=1}^n logf_y(y) -\sum_{i=1}^nlog\left(\dfrac{-1}{g^{-1}(y)(-1+g^{-1}(y)^\lambda)}\right)
 $$
 And as such the likelihood is simply:
 $$
-l(y) = \sum_{i=1}^n logf_y(y) +\sum_{i=1}^nlog\left(\dfrac{-1}{g^{-1}(y)(-1+g^{-1}(y)^\lambda)}\right)
+\mathcal{L}(y) = \sum_{i=1}^n logf_y(y) +\sum_{i=1}^nlog\left(\dfrac{-1}{g^{-1}(y)(-1+g^{-1}(y)^\lambda)}\right)
 $$
 Which corresponds to the calculation above.
 
@@ -248,12 +249,15 @@ norm.lin.sds <- sqrt(diag(solve(hessian( func = NLL.norm.lin, x = norm.lin.par$p
 Wald.CI.upper <- norm.lin.par$par + qnorm(0.975) * norm.lin.sds
 Wald.CI.lower <- norm.lin.par$par - qnorm(0.975) * norm.lin.sds
 
-cat("beta_0 = ", norm.lin.par$par[1], "95% CI [",Wald.CI.lower[1],", ",Wald.CI.upper[1],"]"
-    ,"\nbeta_1 = ", norm.lin.par$par[2], "95% CI [",Wald.CI.lower[2],", ",Wald.CI.upper[2],"]"
-    ,"\nbeta_2 = ", norm.lin.par$par[3], "95% CI [",Wald.CI.lower[3],", ",Wald.CI.upper[3],"]"
+cat( "Intercept:          beta_0 = ", round(norm.lin.par$par[1],4), "95% WALD CI [",  round(Wald.CI.lower[1],4),", ",round(Wald.CI.upper[1],4),"]"
+    ,"\nWind speed:         beta_1 =  ", round(norm.lin.par$par[2],4), "95% WALD CI [ ",round(Wald.CI.lower[2],4),",  ",round(Wald.CI.upper[2],4)," ]"
+    ,"\nWind speed squared: beta_2 = ", round(norm.lin.par$par[3],4), "95% WALD CI [",round(Wald.CI.lower[3],4),", ",round(Wald.CI.upper[3],4),"]"
 )
+```
 
-#Test regularity
+
+```{r}
+#Test regularity to make sure the wald CIs are an sufficient approximation of the actual CIs
 score.nll.norm <- function(theta, regr1, regr2, response, sigma){
   
   beta0 <- theta[1]
