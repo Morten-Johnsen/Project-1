@@ -213,17 +213,20 @@ grid.arrange(fitplot,resplot, nrow = 1)
 ```
 
 ```{r}
-AIC(betaModel)
-AIC(ws.and.ws.squared) #hmm, der er jo noget, som ikke passer her
 g_inverse <- function(y,lambda){
   return((1/(exp(y*lambda)+1))^(1/lambda) * exp(y))
 }
 #2*norm.lin.par$objective+2*4
-logLik(betaModel)#compare this to the one below
--norm.lin.par$objective+sum(log(-1/(D$pow.obs.norm*(-1+D$pow.obs.norm^0.26)))) #actual log-likelihood. It's greater than that of the beta model. This corresponds to the figure above :))
-AIC.bm <- -2*logLik(betaModel)+2*( length(betaModel$coefficients$mean) + length(betaModel$coefficients$precision) )
-AIC.normTrans <- 2*(norm.lin.par$objective-sum(log(-1/(D$pow.obs.norm*(-1+D$pow.obs.norm^0.26))))) + 2*length(norm.lin.par$par) #aha, så passer det jo :)
-round(rbind(AIC.bm,AIC.normTrans),digits=4)
+#Extract log likelihood for the beta model:
+logLik_betaModel <- logLik(betaModel)#compare this to the one below
+#The actual log-likelihood of the normal-transformed model can be calculated based on our transformation and change-of-variable in assignment 1
+#here, the log likelihood L(y) consists of two terms: -sum(log(f(y))) and -sum(log(dg/dx)). Thus -log(f(y)) = L(y) + log(dg/dx) and now the
+#likelihoods from the two different models (beta and normal) can be compared:
+logLik.normTrans <- -norm.lin.par$objective+sum(log(-1/(D$pow.obs.norm*(-1+D$pow.obs.norm^0.26)))) #actual log-likelihood. It's greater than that of the beta model. This corresponds to the figure above :))
+AIC.bm <- -2*logLik_betaModel+2*( length(betaModel$coefficients$mean) + length(betaModel$coefficients$precision) )
+AIC.normTrans <- -2*(logLik.normTrans) + 2*length(norm.lin.par$par) #aha, så passer det jo :)
+round(rbind("AIC Beta model: " = AIC.bm
+            ,"AIC Normal model: " = AIC.normTrans),digits=4)
 ```
 Important to note that the NEGATIVE log-likelihood of the function is given by:
 $$
