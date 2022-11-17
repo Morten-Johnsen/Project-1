@@ -300,8 +300,11 @@ abline(lm(res2 ~ beta2.test.range), col = 2, lwd = 2)
 grid()
 
 ```
+Evidently regularity is present.
 
-Interpretation of parameters 
+
+**Interpretation of parameters** 
+
 ```{r}
 ws.and.ws.squared$coefficients
 beta_0 <- ws.and.ws.squared$coefficients[1]
