@@ -19,6 +19,9 @@ library(gridExtra)
 
 if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
   setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
+  D <- read.table("tuno.txt", header=TRUE, sep=" ", 
+                  as.is=TRUE)
+  setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/Assignment 3")
 } else {
   setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
   D <- read.table("tuno.txt", header=TRUE, sep=" ", 
@@ -44,6 +47,42 @@ lambda_NLL <- function(lambda, x = D$pow.obs.norm){
 lambda.hat <- nlminb(start = 0.2, objective = lambda_NLL)
 lambda <- round(lambda.hat$par, 2)
 D$transformed.pow.obs.norm <- Trans.eq1(lambda, D$pow.obs.norm)
+
+ws.and.ws.squared <- lm( (D$transformed.pow.obs.norm ~ ws30 + I(ws30^2)), data = D)
+D$ws.ws2.pred <- ws.and.ws.squared$coefficients[1] + ws.and.ws.squared$coefficients[2] * D$ws30 + ws.and.ws.squared$coefficients[3] * D$ws30^2
+
+ggplot(data = D)+
+  geom_point(aes(x=ws30, y=transformed.pow.obs.norm, colour="Data"), size = 4, alpha = 0.6)+
+  geom_line(aes(x=ws30, y=ws.ws2.pred, colour="ws + ws^2"))+
+  scale_colour_manual(values = c("red", "blue"))+
+  #geom_line(aes(x=ws30, y=ws.ws2.wd.pred, colour="ws + ws^2 + cos(wd)"))+
+  labs(x = "Wind speeds", y="Transformed, norm power obs", colour = "")+
+  theme_bw()+
+  ggtitle("Fitted model in Transformed Domain")
+
+y_p <- D$ws.ws2.pred
+D$y_inv_trans <- 1/( exp(y_p*lambda)+1 )^(1/lambda) * exp(y_p)
+
+ggplot(data = D)+
+  geom_point(aes(x=ws30, y=pow.obs.norm, colour = "Observed power production (Transformed)"), size = 4, alpha = 0.6)+
+  geom_line(aes(x=ws30, y=y_inv_trans, colour="Inverse Transformation of the Normal model"), size = 2)+
+  #geom_line(aes(x=ws30, y=betaModel.pow, colour="The directly fitted beta model"), size = 2)+
+  scale_colour_manual(values = c("blue","red"))+
+  labs(x = "Wind speeds", y="Norm power obs", colour ="")+
+  theme_bw()+
+  labs(colour = "")+
+  ggtitle("Model fits")+
+  theme(legend.background = element_rect(colour = "black"), legend.position = "top")
+
+################################################################################################
+###Analysis of auto-correlation
+##TASK 1 of 7
+#Residuals are:
+e1 <- ws.and.ws.squared$residuals[1:( length(ws.and.ws.squared$residuals)-1 )] #for e_1 - e_n-1
+e2 <- ws.and.ws.squared$residuals[2:length(ws.and.ws.squared$residuals)] #for e_2 - e_n
+
+m_res <- matrix(c(e1,e2), ncol=2, byrow=F)
+
 
 acf(D$pow.obs.norm)
 acf(D$transformed.pow.obs.norm)
