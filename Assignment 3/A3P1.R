@@ -9,6 +9,7 @@ library(openair)
 library(stringr)
 library(numDeriv)
 library(gridExtra)
+library(mvtnorm)
 #library(openair)
 #library(PowerNormal)
 #library(sn)
@@ -76,13 +77,13 @@ ggplot(data = D)+
 
 ################################################################################################
 ###Analysis of auto-correlation
-##TASK 1 of 7
+##TASK 1 of 7...
 #Residuals are:
 e1 <- ws.and.ws.squared$residuals[1:( length(ws.and.ws.squared$residuals)-1 )] #for e_1 - e_n-1
 e2 <- ws.and.ws.squared$residuals[2:length(ws.and.ws.squared$residuals)] #for e_2 - e_n
 
 m_res <- matrix(c(e1,e2), ncol=2, byrow=F)
-
+#
 
 acf(D$pow.obs.norm)
 acf(D$transformed.pow.obs.norm)

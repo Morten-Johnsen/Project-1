@@ -14,7 +14,6 @@ pois.HMM.pn2pw <- function(m,lambda,gamma)
  parvect                                         
 }  
 
-
 pois.HMM.pw2pn <- function(m,parvect)                 
 {                                                     
  epar   <- exp(parvect)                              

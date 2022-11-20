@@ -25,7 +25,7 @@ library(gnorm)
 library(emg)
 library(survival)
 library(survminer)
-
+library(extraDistr)
 
 if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
   setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/")
