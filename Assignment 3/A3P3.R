@@ -192,8 +192,9 @@ round(rbind(2*par.lst$objective + length(par.lst$par)*log(length(D$SLV)), #BICs
 ##CIs of the parameters of the best mixture model. This is the two-modal model.
 opt2$par #we need 5 CIs
 m <- 2
+alpha <- 0.05
 V.w2 <- diag(solve( hessian(func=N.nll, x=opt2$par, n.dist=m, y=D$SLV) ))
-CIs.w2 <- matrix(c(opt2$par-sqrt(V.w2), opt2$par, opt2$par+sqrt(V.w2)), nrow=3, byrow=T) #1st: lower, 2nd: MLE, 3rd: upper
+CIs.w2 <- matrix(c(opt2$par-qnorm(1-alpha/2)*sqrt(V.w2), opt2$par, opt2$par+qnorm(1-alpha/2)*sqrt(V.w2)), nrow=3, byrow=T) #1st: lower, 2nd: MLE, 3rd: upper
 CIs.n2 <- matrix(rep(0,( dim(CIs.w2)[1] * ( dim(CIs.w2)[2]+1 ) ) ), nrow=3, byrow=T)
 for (i in 1:3){
   n2_temp <- N.mix.pw2pn(n.dist=m, theta=CIs.w2[i,(1:m)], eta=CIs.w2[i,(m+1):(2*m)], tau=CIs.w2[i,(2*m+1):(3*m-1)])
