@@ -184,7 +184,7 @@ Calculating the wald test statistic (*p. 156*, or *p. 42 with* $\theta_0 = 0$).
 
 ```{r}
 waldTestStatistic <- beta1/sd.beta1
-wald.p.value <- 2*pnorm(waldTestStatistic)
+wald.p.value <- 2*pnorm(waldTestStatistic) #Skal det her være dnorm i stedet måske?
 
 cat("The wald test statistic = ",waldTestStatistic,
     "\np-value = ", wald.p.value,
