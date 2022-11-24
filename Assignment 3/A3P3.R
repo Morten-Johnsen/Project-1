@@ -203,13 +203,12 @@ for (i in 1:3){
 ###Subtask c of e
 ##PL of one of the variance parameters of the two component model. Driller lidt :/
 #Modifying function N.nll from earlier to accept single value for on of the variances whilst optimising the others:
-N.pl <- function(sd0, n.dist, y){
+N.pl <- function(eta0, n.dist, y){ #to be used for PL of the 2nd variance parameter (working) of the 2 components normal mixture
   #if(n.dist==1){return( -sum(dnorm(y, mean=p[1], sd=exp(p[2]), log=T)))
   #}
-  nll_temp <- function(p, n.dist, y, sd0){
+  nll_temp <- function(p, n.dist=n.dist, y=y, eta0=eta0){ #only works for m = 2
     theta <- p[1:n.dist]
-    p[(n.dist+1)] <- sd0
-    eta <- p[(n.dist+1):(2*n.dist)]#important to remember these parentheses
+    eta <- c(p[n.dist+1], eta0)#important to remember these parentheses
     tau <- p[(2*n.dist+1):(3*n.dist-1)]
     n.pars <- N.mix.pw2pn(n.dist=n.dist, theta=theta, eta=eta, tau=tau)
     n <- length(y)
@@ -220,11 +219,11 @@ N.pl <- function(sd0, n.dist, y){
     return(nll)
   }
   m <- 2
-  mu <- c(1/2,3/2)*mean(D$SLV) #init vals for the optim
-  sigma <- c(1/2,3/2)*sd(D$SLV) #init vals for the optim
+  mu <- c(1/2,3/2)*mean(y) #init vals for the optim
+  sigma <- c(1/2,3/2)*sd(y) #init vals for the optim
   delta <- c(0.5) #fifty-fifty for the two dists
   wpars <- N.mix.pn2pw(n.dist=m, mu=mu, sigma=sigma, delta=delta)
-  opt2_temp <- nlminb(start=c(wpars$theta, wpars$eta, wpars$tau), N.nll, n.dist=m, y=D$SLV)
+  opt2_temp <- nlminb(start=c(wpars$theta, wpars$eta, wpars$tau), nll_temp, n.dist=m, y=y, eta0=eta0)
   n.pars2_temp <- N.mix.pw2pn(n.dist=m,opt2_temp$par[1:m],opt2_temp$par[(m+1):(2*m)],opt2_temp$par[(2*m+1):(3*m-1)])
   n <- length(y)
   ll <- 0
@@ -233,14 +232,32 @@ N.pl <- function(sd0, n.dist, y){
   }
   return(ll)
 }
-sd2.n <- seq(max(opt2$par[m+1]-2*sqrt(V.w2)[m+1],-1),
-            min(opt2$par[m+1]+2*sqrt(V.w2)[m+1],1),
-            length=10)
-N.llp <- sapply(X = sd2.n, FUN=N.pl, n.dist=m, y=D$SLV)
+
+N.pl2 <- function(eta0, n.dist, y, optpar){
+  theta <- optpar[1:n.dist]
+  eta <- optpar[(n.dist+1):(2*n.dist)]#important to remember these parentheses
+  eta[n.dist] <- eta0
+  tau <- optpar[(2*n.dist+1):(3*n.dist-1)]
+  n.pars <- N.mix.pw2pn(n.dist=n.dist, theta=theta, eta=eta, tau=tau)
+  n <- length(y)
+  ll <- 0
+  for(i in 1:n){
+    ll <- ll + log(sum(n.pars$delta * dnorm(y[i], mean=n.pars$mu, sd=n.pars$sigma)))
+  }
+  return(ll)
+}
+
+eta2.w <- seq(opt2$par[2*m]-10*sqrt(V.w2)[2*m],
+             opt2$par[2*m]+10*sqrt(V.w2)[2*m],
+            length=100)
+N.llp <- sapply(X = eta2.w, FUN=N.pl, n.dist=m, y=D$SLV)
+N.llp2 <- sapply(X = eta2.w, FUN=N.pl2, n.dist=m, y=D$SLV, optpar=opt2$par)
 
 plot(sd2.n,exp(N.llp-max(N.llp)),type="l")
-lines(range(V2.n),
+lines(range(sd2.n),
       exp(-c(1,1) * qchisq(0.95,df=1)/2),
       col=2,lty=2)
-
-
+plot(sd2.n,N.llp)
+abline(v = opt2$par[2*m])
+plot(sd2.n, N.llp2)
+abline(v = opt2$par[2*m])
