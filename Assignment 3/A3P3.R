@@ -278,7 +278,7 @@ abline(v=opt2$par[m+1], col="red")
 # abline(h=-opt2$objective)
 
 ####################################################################################################
-###Task d of e
+###Subtask d of e
 N.llp.rep <- sapply(X = eta1.w, FUN=N.pl, n.dist=m, y=D$SLV, robust=T)
 N.llp2.rep <- sapply(X = eta2.w, FUN=N.pl, n.dist=m, y=D$SLV, first=F, robust=T)
 
@@ -298,31 +298,39 @@ lines(range(eta2.w),
 abline(v=opt2$par[2*m], col="blue")
 abline(v=opt2$par[m+1], col="red")
 ####################################################################################################
+###Subtask e of e
+
+
+####################################################################################################
 ####################################################################################################
 ####Task 2 of 2
 ###Subtask a of e
-pois.HMM.pn2pw <- function(m,lambda,gamma)
+N.HMM.pn2pw <- function(m,mu,sigma,gamma)
 {                                              
-  tlambda <- log(lambda)                         
+  theta <- mu
+  eta <- log(sigma)
   tgamma  <- NULL                              
   if(m>1)                                        
   {                                            
     foo   <- log(gamma/diag(gamma))           
     tgamma<- as.vector(foo[!diag(m)])             
   }                                             
-  parvect <- c(tlambda,tgamma)                    
+  parvect <- c(theta,eta,tgamma)                    
   parvect                                         
 }  
 
+#dat <- read.table("earthquakes.txt",header=FALSE)
 m <- 2
-lambda <- c(1/2,3/2) * 1 / mean(D$SLV)
-gamma <- matrix(c(0.95,0.05,0.05,0.95), ncol=2,byrow=T)
-wpars2 <- pois.HMM.pn2pw(m=m, lambda=lambda, gamma=gamma) #seeing how it works
+mu <- c(1/2,3/2) * mean(D$SLV) #arbitrary
+sigma <- c(1/4,8) * sd(D$SLV) #arbitrary
+gamma <- matrix(c(0.95,0.05,0.05,0.95), ncol=2,byrow=T) #arbitrary
+wpars2.HMM <- N.HMM.pn2pw(m=m, mu=mu, sigma=sigma, gamma=gamma) #seeing how it works
 
-pois.HMM.pw2pn <- function(m,parvect)                 
+N.HMM.pw2pn <- function(m,parvect)                 
 {                                                     
-  epar   <- exp(parvect)                              
-  lambda <- epar[1:m]                                   
+  epar   <- exp(parvect)   
+  mu <- parvect[1:m]
+  sigma <- epar[(m+1):(2*m)]
   gamma  <- diag(m)                                    
   if(m>1)                                               
   {                                                  
@@ -330,24 +338,30 @@ pois.HMM.pw2pn <- function(m,parvect)
     gamma         <- gamma/apply(gamma,1,sum)          
   }                                                   
   delta  <- solve(t(diag(m)-gamma+1),rep(1,m))          
-  list(lambda=lambda,gamma=gamma,delta=delta)           
+  list(mu=mu,sigma=sigma,gamma=gamma,delta=delta)           
 }  
 
-npars2 <- pois.HMM.pw2pn(m=m, parvect=wpars2)
+npars2.HMM <- N.HMM.pw2pn(m=m, parvect=wpars2.HMM)
 
-pois.HMM.mllk <- function(parvect,x,m,...)       
+N.HMM.mllk <- function(parvect,x,m,...)       
 {
+  findNorm <- function(theta){
+    mu<-theta[1]
+    sd<-theta[2]
+    dnorm(x,mean = mu, sd = sd)
+    }
   #    print(parvect)
-  if(m==1) return(-sum(dpois(x,exp(parvect),log=TRUE))) 
-  n          <- length(x)                            
-  pn         <- pois.HMM.pw2pn(m,parvect)            
-  allprobs   <- outer(x,pn$lambda,dpois)             
-  allprobs   <- ifelse(!is.na(allprobs),allprobs,1)  
+  if(m==1) return(-sum(dnorm(x,mean=parvect[1],sd=exp(parvect[2]),log=TRUE)))
+  n          <- length(x)    
+  pn         <- N.HMM.pw2pn(m,parvect)
+  allprobs <- apply(cbind(pn$mu,pn$sigma), MARGIN = 1, FUN = findNorm)
+  #allprobs   <- outer(x,pn$mu,pn$sigma,FUN=dnorm)  
+  allprobs   <- ifelse(!is.na(allprobs),allprobs,1)
   lscale     <- 0                                    
   foo        <- pn$delta                             
   for (i in 1:n)                                    
   {                                                
-    foo    <- foo%*%pn$gamma*allprobs[i,]            
+    foo    <- foo%*%pn$gamma*allprobs[i,]        
     sumfoo <- sum(foo)                               
     lscale <- lscale+log(sumfoo)                    
     foo    <- foo/sumfoo                            
@@ -356,28 +370,71 @@ pois.HMM.mllk <- function(parvect,x,m,...)
   mllk                                              
 }    
 
-mllk2 <- pois.HMM.mllk(parvect=wpars2,x=D$SLV,m=m)
+mllk2 <- N.HMM.mllk(parvect=wpars2.HMM,x=D$SLV,m=m)
 
-pois.HMM.mle.nlminb <- function(x,m,lambda0,gamma0,...)
+
+N.HMM.mle.nlminb <- function(x,m,mu0,sigma0,gamma0,...)
 {                                                      
-  parvect0 <- pois.HMM.pn2pw(m,lambda0,gamma0)
+  parvect0 <- N.HMM.pn2pw(m,mu0,sigma0,gamma0)
   np        <- length(parvect0)                          
   lower    <- rep(-10,np)
   upper    <- c(rep(max(x),m),rep(10,np-m))
-  mod      <- nlminb(parvect0,pois.HMM.mllk,x=x,m=m,
+  mod      <- nlminb(parvect0,N.HMM.mllk,x=x,m=m,
                      lower=lower,upper=upper)
   if(mod$convergence!=0){
     print(mod)
   }
-  pn       <- pois.HMM.pw2pn(m,mod$par)
+  pn       <- N.HMM.pw2pn(m,mod$par)
   mllk     <- mod$objective
   AIC       <- 2*(mllk+np)
   n         <- sum(!is.na(x))
   BIC       <- 2*mllk+np*log(n)
-  list(lambda=pn$lambda,gamma=pn$gamma,delta=pn$delta,   
+  list(mu=pn$mu,sigma=pn$sigma,gamma=pn$gamma,delta=pn$delta,   
        code=mod$convergence,mllk=mllk,AIC=AIC,BIC=BIC)   
-}  
+}
 
-pois.HMM.mle.nlminb(x=D$SLV,m=m,lambda0=lambda,gamma0=gamma)
+mle2.HMM <- N.HMM.mle.nlminb(x=D$SLV,m=m,mu0=mu,sigma0=sigma,gamma0=gamma)
+
+ggplot(D)+
+  geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
+  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = mle2.HMM$mu[1],
+                                                        sd = mle2.HMM$sigma[1]), color = 'red') +
+  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = mle2.HMM$mu[2],
+                                                        sd = mle2.HMM$sigma[2]), color = 'orange') +
+  ggtitle("HMM with 2 normal distributions fitted to SLV")
+
+m0 <- 3
+mu0 <- c(1/2, 1, 3/2) * mean(D$SLV) #arbitrary
+sigma0 <- c(1/4, 2, 8) * sd(D$SLV) #arbitrary
+gamma0 <- matrix(c(0.95,0.025,0.025,0.025,0.95,0.025,0.025,0.025,0.95), ncol=3,byrow=T) #arbitrary
+
+wpars3.HMM <- N.HMM.pn2pw(m=m0, mu=mu0, sigma=sigma0, gamma=gamma0)
+mllk3 <- N.HMM.mllk(parvect=wpars3.HMM,x=D$SLV,m=m0)
+
+mle3.HMM <- N.HMM.mle.nlminb(x=D$SLV,m=m0,mu0=mu0,sigma0=sigma0,gamma0=gamma0)
+
+ggplot(D)+
+  geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
+  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = mle3.HMM$mu[1],
+                                                        sd = mle3.HMM$sigma[1]), color = 'red') +
+  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = mle3.HMM$mu[2],
+                                                        sd = mle3.HMM$sigma[2]), color = 'orange') +
+  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = mle3.HMM$mu[3],
+                                                        sd = mle3.HMM$sigma[3]), color = 'blue') +
+  #xlim(c(-0.985,-0.90))+
+  ggtitle("HMM with 3 normal distributions fitted to SLV")
+
+par(mfrow=c(1,1))
+hist(rnorm(n=10000,mean=mle3.HMM$mu[1],sd=mle3.HMM$sigma[1]))
+
+mle2.HMM$AIC
+mle3.HMM$AIC
+####################################################################################################
+###Subtask b of e
+
+
+
+
+
 
 
