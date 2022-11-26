@@ -337,7 +337,7 @@ N.HMM.pw2pn <- function(m,parvect)
     gamma[!gamma] <- epar[(m+1):(m*m)]                  
     gamma         <- gamma/apply(gamma,1,sum)          
   }                                                   
-  delta  <- solve(t(diag(m)-gamma+1),rep(1,m))          
+  delta  <- solve(t(diag(m)-gamma+1),rep(1,m))
   list(mu=mu,sigma=sigma,gamma=gamma,delta=delta)           
 }  
 
@@ -355,7 +355,7 @@ N.HMM.mllk <- function(parvect,x,m,...)
   n          <- length(x)    
   pn         <- N.HMM.pw2pn(m,parvect)
   allprobs <- apply(cbind(pn$mu,pn$sigma), MARGIN = 1, FUN = findNorm)
-  #allprobs   <- outer(x,pn$mu,pn$sigma,FUN=dnorm)  
+  allprobs   <- outer(x,pn$mu,pn$sigma,FUN=dnorm)  
   allprobs   <- ifelse(!is.na(allprobs),allprobs,1)
   lscale     <- 0                                    
   foo        <- pn$delta                             
@@ -431,6 +431,20 @@ mle2.HMM$AIC
 mle3.HMM$AIC
 ####################################################################################################
 ###Subtask b of e
+
+
+####################################################################################################
+###Subtask c of e
+mle2.HMM$mu #mean of the two normal HMMs
+mle2.HMM$sigma #sd of the two normal HMMs
+mle2.HMM$gamma #t.p.m. for the transitioning between the two normal HMMs. Sølje: til, række: fra 
+mle2.HMM$delta #Long term probabilities for ending up in each group.
+               #delta 2 > delta 1, so the second model is most likely at t -> inf.
+
+####################################################################################################
+###Subtask d of e
+
+
 
 
 
