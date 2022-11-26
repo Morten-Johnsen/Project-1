@@ -7,8 +7,8 @@ pois.HMM.pn2pw <- function(m,lambda,gamma)
  tgamma  <- NULL                              
  if(m>1)                                        
    {                                            
-   foo   <- log(gamma/diag(gamma))           
-   tgamma<- as.vector(foo[!diag(m)])             
+   foo   <- log(gamma/diag(gamma)) #divide off-diagonal elements with the diagonal elements           
+   tgamma<- as.vector(foo[!diag(m)]) #remove diagonal elements              
    }                                             
  parvect <- c(tlambda,tgamma)                    
  parvect                                         
@@ -21,12 +21,12 @@ pois.HMM.pw2pn <- function(m,parvect)
  gamma  <- diag(m)                                    
  if(m>1)                                               
    {                                                  
-   gamma[!gamma] <- epar[(m+1):(m*m)]                  
+   gamma[!gamma] <- epar[(m+1):(m*m)] #sølje: til, række: fra  
    gamma         <- gamma/apply(gamma,1,sum)          
    }                                                   
  delta  <- solve(t(diag(m)-gamma+1),rep(1,m))          
  list(lambda=lambda,gamma=gamma,delta=delta)           
-}  
+}
 
 
 pois.HMM.mllk <- function(parvect,x,m,...)       
@@ -35,7 +35,7 @@ pois.HMM.mllk <- function(parvect,x,m,...)
  if(m==1) return(-sum(dpois(x,exp(parvect),log=TRUE))) 
  n          <- length(x)                            
  pn         <- pois.HMM.pw2pn(m,parvect)            
- allprobs   <- outer(x,pn$lambda,dpois)             
+ allprobs   <- outer(x,pn$lambda,dpois)     
  allprobs   <- ifelse(!is.na(allprobs),allprobs,1)  
  lscale     <- 0                                    
  foo        <- pn$delta                             
