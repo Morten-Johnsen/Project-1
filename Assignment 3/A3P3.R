@@ -204,12 +204,17 @@ for (i in 1:3){
 ###Subtask c of e
 ##PL of one of the variance parameters of the two component model. Driller lidt :/
 #Modifying function N.nll from earlier to accept single value for on of the variances whilst optimising the others:
-N.pl <- function(eta0, n.dist, y){ #to be used for PL of the 2nd variance parameter (working) of the 2 components normal mixture
+N.pl <- function(eta0, n.dist, y, first=T, robust=F){ #to be used for PL of the 2nd variance parameter (working) of the 2 components normal mixture
   #if(n.dist==1){return( -sum(dnorm(y, mean=p[1], sd=exp(p[2]), log=T)))
   #}
-  nll_temp <- function(p, n.dist=n.dist, y=y, eta0=eta0){ #only works for m = 2
+  nll_temp <- function(p, n.dist=n.dist, y=y, eta0=eta0, bool=first){ #only works m = 2
     theta <- p[1:n.dist]
-    eta <- c(p[n.dist+1], eta0)#important to remember these parentheses
+    eta <- p[(n.dist+1):(2*n.dist)]#important to remember these parentheses
+    if(bool){
+      eta[1] <- eta0
+    } else {
+      eta[n.dist] <- eta0
+    }
     tau <- p[(2*n.dist+1):(3*n.dist-1)]
     n.pars <- N.mix.pw2pn(n.dist=n.dist, theta=theta, eta=eta, tau=tau)
     n <- length(y)
@@ -221,11 +226,19 @@ N.pl <- function(eta0, n.dist, y){ #to be used for PL of the 2nd variance parame
   }
   m <- 2
   mu <- c(1/2,3/2)*mean(y) #init vals for the optim
-  sigma <- c(1/2,3/2)*sd(y) #init vals for the optim
+  sigma <- c(1/4,8)*sd(y) #init vals for the optim
   delta <- c(0.5) #fifty-fifty for the two dists
   wpars <- N.mix.pn2pw(n.dist=m, mu=mu, sigma=sigma, delta=delta)
-  opt2_temp <- nlminb(start=c(wpars$theta, wpars$eta, wpars$tau), nll_temp, n.dist=m, y=y, eta0=eta0)
-  n.pars2_temp <- N.mix.pw2pn(n.dist=m,opt2_temp$par[1:m],opt2_temp$par[(m+1):(2*m)],opt2_temp$par[(2*m+1):(3*m-1)])
+  opt2_temp <- nlminb(start=c(wpars$theta, wpars$eta, wpars$tau), objective=nll_temp, n.dist=m, y=y, eta0=eta0)
+  #n.pars2_temp <- N.mix.pw2pn(n.dist=m,opt2_temp$par[1:m],opt2_temp$par[(m+1):(2*m)],opt2_temp$par[(2*m+1):(3*m-1)])
+  if(first){
+    n.pars2_temp <- N.mix.pw2pn(n.dist=m,opt2_temp$par[1:m],c(eta0, opt2_temp$par[(2*m)]),opt2_temp$par[(2*m+1):(3*m-1)])
+  } else{
+    n.pars2_temp <- N.mix.pw2pn(n.dist=m,opt2_temp$par[1:m],c(opt2_temp$par[(m+1)], eta0),opt2_temp$par[(2*m+1):(3*m-1)])
+  }
+  if(robust){
+    n.pars2_temp$sigma = sort(n.pars2_temp$sigma)
+  }
   n <- length(y)
   ll <- 0
   for (i in 1:n){
@@ -234,31 +247,137 @@ N.pl <- function(eta0, n.dist, y){ #to be used for PL of the 2nd variance parame
   return(ll)
 }
 
-N.pl2 <- function(eta0, n.dist, y, optpar){
-  theta <- optpar[1:n.dist]
-  eta <- optpar[(n.dist+1):(2*n.dist)]#important to remember these parentheses
-  eta[n.dist] <- eta0
-  tau <- optpar[(2*n.dist+1):(3*n.dist-1)]
-  n.pars <- N.mix.pw2pn(n.dist=n.dist, theta=theta, eta=eta, tau=tau)
-  n <- length(y)
-  ll <- 0
-  for(i in 1:n){
-    ll <- ll + log(sum(n.pars$delta * dnorm(y[i], mean=n.pars$mu, sd=n.pars$sigma)))
-  }
-  return(ll)
-}
-
-eta2.w <- seq(opt2$par[2*m]-10*sqrt(V.w2)[2*m],
-             opt2$par[2*m]+10*sqrt(V.w2)[2*m],
+eta1.w <- seq(opt2$par[m+1]-6*sqrt(V.w2)[m+1],
+              opt2$par[m+1]+30*sqrt(V.w2)[m+1],
+              length=100)
+eta2.w <- seq(opt2$par[2*m]-6*sqrt(V.w2)[2*m],
+             opt2$par[2*m]+6*sqrt(V.w2)[2*m],
             length=100)
-N.llp <- sapply(X = eta2.w, FUN=N.pl, n.dist=m, y=D$SLV)
-N.llp2 <- sapply(X = eta2.w, FUN=N.pl2, n.dist=m, y=D$SLV, optpar=opt2$par)
+m <- 2
+N.llp <- sapply(X = eta1.w, FUN=N.pl, n.dist=m, y=D$SLV)
+N.llp2 <- sapply(X = eta2.w, FUN=N.pl, n.dist=m, y=D$SLV, first=F)
 
-plot(sd2.n,exp(N.llp-max(N.llp)),type="l")
-lines(range(sd2.n),
+plot(eta1.w,exp(N.llp-(max(N.llp))),type="l",
+     main = "Profile likelihood of FIRST variance param of 2 component norm mixture dist") #smart Jan-plot
+lines(range(eta1.w),
       exp(-c(1,1) * qchisq(0.95,df=1)/2),
       col=2,lty=2)
-plot(sd2.n,N.llp)
-abline(v = opt2$par[2*m])
-plot(sd2.n, N.llp2)
-abline(v = opt2$par[2*m])
+abline(v=opt2$par[m+1], col="red") #first MLE var
+abline(v=opt2$par[2*m], col="blue") # second MLE var
+
+plot(eta2.w,exp(N.llp2-(max(N.llp2))),type="l",
+     main = "Profile likelihood of SECOND variance param of 2 component norm mixture dist") #smart Jan-plot
+lines(range(eta2.w),
+      exp(-c(1,1) * qchisq(0.95,df=1)/2),
+      col=2,lty=2)
+abline(v=opt2$par[2*m], col="blue")
+abline(v=opt2$par[m+1], col="red")
+
+# plot(eta2.w,N.llp, type="l") #grimt plot.
+# abline(v = opt2$par[2*m])
+# abline(h=-opt2$objective)
+
+####################################################################################################
+###Task d of e
+N.llp.rep <- sapply(X = eta1.w, FUN=N.pl, n.dist=m, y=D$SLV, robust=T)
+N.llp2.rep <- sapply(X = eta2.w, FUN=N.pl, n.dist=m, y=D$SLV, first=F, robust=T)
+
+plot(eta1.w,exp(N.llp.rep-(max(N.llp.rep))),type="l",
+     main = "Profile likelihood of FIRST variance param of 2 component norm mixture dist") #smart Jan-plot
+lines(range(eta1.w),
+      exp(-c(1,1) * qchisq(0.95,df=1)/2),
+      col=2,lty=2)
+abline(v=opt2$par[m+1], col="red") #first MLE var
+abline(v=opt2$par[2*m], col="blue") # second MLE var
+
+plot(eta2.w,exp(N.llp2.rep-(max(N.llp2.rep))),type="l",
+     main = "Profile likelihood of SECOND variance param of 2 component norm mixture dist") #smart Jan-plot
+lines(range(eta2.w),
+      exp(-c(1,1) * qchisq(0.95,df=1)/2),
+      col=2,lty=2)
+abline(v=opt2$par[2*m], col="blue")
+abline(v=opt2$par[m+1], col="red")
+####################################################################################################
+####################################################################################################
+####Task 2 of 2
+###Subtask a of e
+pois.HMM.pn2pw <- function(m,lambda,gamma)
+{                                              
+  tlambda <- log(lambda)                         
+  tgamma  <- NULL                              
+  if(m>1)                                        
+  {                                            
+    foo   <- log(gamma/diag(gamma))           
+    tgamma<- as.vector(foo[!diag(m)])             
+  }                                             
+  parvect <- c(tlambda,tgamma)                    
+  parvect                                         
+}  
+
+m <- 2
+lambda <- c(1/2,3/2) * 1 / mean(D$SLV)
+gamma <- matrix(c(0.95,0.05,0.05,0.95), ncol=2,byrow=T)
+wpars2 <- pois.HMM.pn2pw(m=m, lambda=lambda, gamma=gamma) #seeing how it works
+
+pois.HMM.pw2pn <- function(m,parvect)                 
+{                                                     
+  epar   <- exp(parvect)                              
+  lambda <- epar[1:m]                                   
+  gamma  <- diag(m)                                    
+  if(m>1)                                               
+  {                                                  
+    gamma[!gamma] <- epar[(m+1):(m*m)]                  
+    gamma         <- gamma/apply(gamma,1,sum)          
+  }                                                   
+  delta  <- solve(t(diag(m)-gamma+1),rep(1,m))          
+  list(lambda=lambda,gamma=gamma,delta=delta)           
+}  
+
+npars2 <- pois.HMM.pw2pn(m=m, parvect=wpars2)
+
+pois.HMM.mllk <- function(parvect,x,m,...)       
+{
+  #    print(parvect)
+  if(m==1) return(-sum(dpois(x,exp(parvect),log=TRUE))) 
+  n          <- length(x)                            
+  pn         <- pois.HMM.pw2pn(m,parvect)            
+  allprobs   <- outer(x,pn$lambda,dpois)             
+  allprobs   <- ifelse(!is.na(allprobs),allprobs,1)  
+  lscale     <- 0                                    
+  foo        <- pn$delta                             
+  for (i in 1:n)                                    
+  {                                                
+    foo    <- foo%*%pn$gamma*allprobs[i,]            
+    sumfoo <- sum(foo)                               
+    lscale <- lscale+log(sumfoo)                    
+    foo    <- foo/sumfoo                            
+  }                                               
+  mllk       <- -lscale                            
+  mllk                                              
+}    
+
+mllk2 <- pois.HMM.mllk(parvect=wpars2,x=D$SLV,m=m)
+
+pois.HMM.mle.nlminb <- function(x,m,lambda0,gamma0,...)
+{                                                      
+  parvect0 <- pois.HMM.pn2pw(m,lambda0,gamma0)
+  np        <- length(parvect0)                          
+  lower    <- rep(-10,np)
+  upper    <- c(rep(max(x),m),rep(10,np-m))
+  mod      <- nlminb(parvect0,pois.HMM.mllk,x=x,m=m,
+                     lower=lower,upper=upper)
+  if(mod$convergence!=0){
+    print(mod)
+  }
+  pn       <- pois.HMM.pw2pn(m,mod$par)
+  mllk     <- mod$objective
+  AIC       <- 2*(mllk+np)
+  n         <- sum(!is.na(x))
+  BIC       <- 2*mllk+np*log(n)
+  list(lambda=pn$lambda,gamma=pn$gamma,delta=pn$delta,   
+       code=mod$convergence,mllk=mllk,AIC=AIC,BIC=BIC)   
+}  
+
+pois.HMM.mle.nlminb(x=D$SLV,m=m,lambda0=lambda,gamma0=gamma)
+
+
