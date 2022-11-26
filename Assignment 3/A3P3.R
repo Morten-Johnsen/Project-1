@@ -440,6 +440,7 @@ mle2.HMM$sigma #sd of the two normal HMMs
 mle2.HMM$gamma #t.p.m. for the transitioning between the two normal HMMs. Sølje: til, række: fra 
 mle2.HMM$delta #Long term probabilities for ending up in each group.
                #delta 2 > delta 1, so the second model is most likely at t -> inf.
+#solve(t(diag(m)-gamma+1),rep(1,m)) #this the way delta is calculated. System of two equations with two unknowns.
 
 ####################################################################################################
 ###Subtask d of e
