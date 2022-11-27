@@ -249,10 +249,10 @@ N.pl <- function(eta0, n.dist, y, first=T, robust=F){ #to be used for PL of the 
 
 eta1.w <- seq(opt2$par[m+1]-6*sqrt(V.w2)[m+1],
               opt2$par[m+1]+30*sqrt(V.w2)[m+1],
-              length=100)
+              length=25)
 eta2.w <- seq(opt2$par[2*m]-6*sqrt(V.w2)[2*m],
              opt2$par[2*m]+6*sqrt(V.w2)[2*m],
-            length=100)
+            length=25)
 m <- 2
 N.llp <- sapply(X = eta1.w, FUN=N.pl, n.dist=m, y=D$SLV)
 N.llp2 <- sapply(X = eta2.w, FUN=N.pl, n.dist=m, y=D$SLV, first=F)
@@ -321,7 +321,7 @@ N.HMM.pn2pw <- function(m,mu,sigma,gamma)
 
 #dat <- read.table("earthquakes.txt",header=FALSE)
 m <- 2
-mu <- c(1/2,3/2) * mean(D$SLV) #arbitrary
+mu <- c(-1,1) * mean(D$SLV) #arbitrary
 sigma <- c(1/4,8) * sd(D$SLV) #arbitrary
 gamma <- matrix(c(0.95,0.05,0.05,0.95), ncol=2,byrow=T) #arbitrary
 wpars2.HMM <- N.HMM.pn2pw(m=m, mu=mu, sigma=sigma, gamma=gamma) #seeing how it works
@@ -337,7 +337,7 @@ N.HMM.pw2pn <- function(m,parvect)
     gamma[!gamma] <- epar[(m+1):(m*m)]                  
     gamma         <- gamma/apply(gamma,1,sum)          
   }                                                   
-  delta  <- solve(t(diag(m)-gamma+1),rep(1,m))
+  delta  <- solve(t(diag(m)-gamma+1),rep(1,m)) #p. 19 in HMM, solving system of equations
   list(mu=mu,sigma=sigma,gamma=gamma,delta=delta)           
 }  
 
@@ -355,16 +355,16 @@ N.HMM.mllk <- function(parvect,x,m,...)
   n          <- length(x)    
   pn         <- N.HMM.pw2pn(m,parvect)
   allprobs <- apply(cbind(pn$mu,pn$sigma), MARGIN = 1, FUN = findNorm)
-  allprobs   <- outer(x,pn$mu,pn$sigma,FUN=dnorm)  
+  #allprobs   <- outer(x,pn$mu,pn$sigma,FUN=dnorm)
   allprobs   <- ifelse(!is.na(allprobs),allprobs,1)
   lscale     <- 0                                    
   foo        <- pn$delta                             
   for (i in 1:n)                                    
   {                                                
-    foo    <- foo%*%pn$gamma*allprobs[i,]        
+    foo    <- foo%*%pn$gamma*allprobs[i,] #pn$delta = pn$delta %*% pn$gamma for i = 1. Beregning er jf. slide 14, lecture 11
     sumfoo <- sum(foo)                               
     lscale <- lscale+log(sumfoo)                    
-    foo    <- foo/sumfoo                            
+    foo    <- foo/sumfoo
   }                                               
   mllk       <- -lscale                            
   mllk                                              
@@ -392,8 +392,16 @@ N.HMM.mle.nlminb <- function(x,m,mu0,sigma0,gamma0,...)
   list(mu=pn$mu,sigma=pn$sigma,gamma=pn$gamma,delta=pn$delta,   
        code=mod$convergence,mllk=mllk,AIC=AIC,BIC=BIC)   
 }
-
+#following five lines are repeated from above
+m <- 2
+mu <- c(-2,2) * mean(D$SLV) #arbitrary
+sigma <- c(1/2,4) * sd(D$SLV) #arbitrary
+gamma <- matrix(c(0.95,0.05,0.05,0.95), ncol=2,byrow=T) #arbitrary
+wpars2.HMM <- N.HMM.pn2pw(m=m, mu=mu, sigma=sigma, gamma=gamma) #seeing how it works
 mle2.HMM <- N.HMM.mle.nlminb(x=D$SLV,m=m,mu0=mu,sigma0=sigma,gamma0=gamma)
+
+#mllk1 <- N.HMM.mllk(parvect=c(mean(D$SLV),log(sd(D$SLV))),x=D$SLV,m=1)
+#mle1.HMM <- N.HMM.mle.nlminb(x=D$SLV,m=1,mu0=mean(D$SLV),sigma0=sd(D$SLV),gamma0=c())
 
 ggplot(D)+
   geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
@@ -403,15 +411,14 @@ ggplot(D)+
                                                         sd = mle2.HMM$sigma[2]), color = 'orange') +
   ggtitle("HMM with 2 normal distributions fitted to SLV")
 
-m0 <- 3
-mu0 <- c(1/2, 1, 3/2) * mean(D$SLV) #arbitrary
-sigma0 <- c(1/4, 2, 8) * sd(D$SLV) #arbitrary
-gamma0 <- matrix(c(0.95,0.025,0.025,0.025,0.95,0.025,0.025,0.025,0.95), ncol=3,byrow=T) #arbitrary
+m3 <- 3
+mu3 <- c(0,0,0) * mean(D$SLV) #arbitrary -1,1/2,1
+sigma3 <- c(1, 1, 1) * sd(D$SLV) #arbitrary 1/4,1,4
+gamma3 <- matrix(rep(1/3,9), ncol=3,byrow=T) #arbitrary 0.95, 0.25, 0.25
+#wpars3.HMM <- N.HMM.pn2pw(m=m0, mu=mu0, sigma=sigma0, gamma=gamma0)
+#mllk3 <- N.HMM.mllk(parvect=wpars3.HMM,x=D$SLV,m=m0)
 
-wpars3.HMM <- N.HMM.pn2pw(m=m0, mu=mu0, sigma=sigma0, gamma=gamma0)
-mllk3 <- N.HMM.mllk(parvect=wpars3.HMM,x=D$SLV,m=m0)
-
-mle3.HMM <- N.HMM.mle.nlminb(x=D$SLV,m=m0,mu0=mu0,sigma0=sigma0,gamma0=gamma0)
+mle3.HMM <- N.HMM.mle.nlminb(x=D$SLV,m=m3,mu0=mu3,sigma0=sigma3,gamma0=gamma3)
 
 ggplot(D)+
   geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
@@ -424,11 +431,9 @@ ggplot(D)+
   #xlim(c(-0.985,-0.90))+
   ggtitle("HMM with 3 normal distributions fitted to SLV")
 
-par(mfrow=c(1,1))
-hist(rnorm(n=10000,mean=mle3.HMM$mu[1],sd=mle3.HMM$sigma[1]))
-
-mle2.HMM$AIC
-mle3.HMM$AIC
+mle2.HMM$mllk;mle3.HMM$mllk #2 comp normal HMM has 6 params, 3 comp normal HMM has 12... #params=m^2+m
+mle2.HMM$AIC;mle3.HMM$AIC
+mle2.HMM$BIC;mle3.HMM$BIC #so we use 2 components normal HMM
 ####################################################################################################
 ###Subtask b of e
 
@@ -444,12 +449,98 @@ mle2.HMM$delta #Long term probabilities for ending up in each group.
 
 ####################################################################################################
 ###Subtask d of e
+#summing the two dists for the long term
+N.pdf <- function(x,mu,sigma){
+  return(1/(sigma*sqrt(2*pi)) * exp(-1/2 * (x-mu)^2/sigma^2))
+}
 
+final.Dist <- function(x){
+  return(mle2.HMM$delta[1]*N.pdf(x, mle2.HMM$mu[1], mle2.HMM$sigma[1]) +
+           mle2.HMM$delta[2]*N.pdf(x, mle2.HMM$mu[2], mle2.HMM$sigma[2]))
+}
 
+par(mfrow = c(1,1))
+interval <- seq(min(D$SLV), max(D$SLV), length.out = length(D$SLV))
+ggplot(D)+
+  geom_histogram(aes(x = SLV, y=..density..))+
+  geom_line(aes(x = interval, y = final.Dist(interval)))
+plot(interval, final.Dist(interval), "l")
 
+givenState1 <- function(x){
+  return(mle2.HMM$gamma[1,1]*N.pdf(x, mle2.HMM$mu[1], mle2.HMM$sigma[1]) +
+           mle2.HMM$gamma[1,2]*N.pdf(x, mle2.HMM$mu[2], mle2.HMM$sigma[2]))
+}
 
+givenState2 <- function(x){
+  return(mle2.HMM$gamma[2,1]*N.pdf(x, mle2.HMM$mu[1], mle2.HMM$sigma[1]) +
+           mle2.HMM$gamma[2,2]*N.pdf(x, mle2.HMM$mu[2], mle2.HMM$sigma[2]))
+}
 
+ggplot(D)+
+  geom_histogram(aes(x = SLV, y=..density..), colour = "white")+
+  geom_line(aes(x = interval, y = givenState1(interval), colour = "Given state 1"))+
+  geom_line(aes(x = interval, y = givenState2(interval), colour = "Given state 2"))+
+  #geom_line(aes(x = interval, y = givenState2(interval)*mle2.HMM$delta[2] + givenState1(interval)*mle2.HMM$delta[1], colour = "Testt stonks"), size = 2)+
+  geom_line(aes(x = interval, y = final.Dist(interval), colour = "Long term returns"))+
+  scale_colour_manual(values = c("darkgreen", "red", "orange", "purple"))+
+  labs(colour = "", x = "SLV")+
+  ggtitle("Long term and 1-step ahead return distributions")+
+  theme_bw()
 
+####################################################################################################
+###Subtask e of f
+N.HMM.generate_sample <- function(n,m,mu,sigma,gamma,delta=NULL)
+{
+  if(is.null(delta))delta<-solve(t(diag(m)-gamma+1),rep(1,m))
+  mvect <- 1:m
+  state <- numeric(n)
+  state[1] <- sample(mvect,1,prob=delta)
+  for (i in 2:n)
+    state[i]<-sample(mvect,1,prob=gamma[state[i-1],])
+  x <- rnorm(n,mean = mu[state], sd = sigma[state])
+  return(x)
+}
+
+HMM_sample <- N.HMM.generate_sample(length(D$SLV), m = 2, mu = mle2.HMM$mu, sigma = mle2.HMM$sigma
+                                    ,gamma = mle2.HMM$gamma, delta = mle2.HMM$delta)
+ggplot(data = D)+
+  geom_histogram(aes(x=SLV,colour="data"),alpha=0.3)+
+  geom_histogram(aes(x=HMM_sample,colour="sample"), alpha=0.3)
+  
+k <- 100
+GAMMA <- matrix(ncol=m*m,nrow=k)
+Mu <- matrix(ncol=m,nrow=k)
+Sigma <- matrix(ncol=m,nrow=k)
+Delta <- matrix(ncol=m,nrow=k)
+Code <- numeric(k)
+for(i in 1:k){
+  set.seed(i)
+  ## generate sample
+  y.sim <- N.HMM.generate_sample(length(D$SLV), m = 2, mu = mle2.HMM$mu, sigma = mle2.HMM$sigma
+                                 ,gamma = mle2.HMM$gamma, delta = mle2.HMM$delta)
+  ## fit model to sample
+  mle.tmp <- N.HMM.mle.nlminb(x=y.sim, m=m, mu0=mu, sigma0=sigma, gamma0=gamma)
+  ## Store result
+  GAMMA[i, ] <- c(mle.tmp$gamma[1, ],
+                  mle.tmp$gamma[2, ])
+  Mu[i, ] <-  mle.tmp$mu
+  Sigma[i, ] <- mle.tmp$sigma
+  Delta[i, ] <-   mle.tmp$delta
+  Code[i] <-      mle.tmp$code
+  print(c(i,Code[i]))
+}
+sum(Code!=1)
+
+hist(Mu)
+hist(Sigma)
+hist(Delta)
+
+quantile(Mu[1,],c(0.025,0.975)) #[-0.0017348039  0.0006418064 ] mle: 0.00109
+quantile(Mu[2,],c(0.025,0.975)) #[0.002269836 0.011556952 ] mle: 0.00183
+quantile(Sigma[1,],c(0.025,0.975))#[0.03542870 0.06235345 ] mle: 0.0317
+quantile(Sigma[2,],c(0.025,0.975)) #[0.02948821 0.05840838 ] mle: 0.0596
+quantile(Delta[1,],c(0.025,0.975)) #[0.3682242 0.6317758 ] mle: 0.353
+quantile(Delta[2,],c(0.025,0.975)) #[0.3416134 0.6583866 ] mle: 0.647
 
 
 
