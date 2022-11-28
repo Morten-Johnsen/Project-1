@@ -303,7 +303,7 @@ abline(v=opt2$par[m+1], col="red")
 
 ####################################################################################################
 ####################################################################################################
-####Task 2 of 2
+####Task 2 of 2 HMMs
 ###Subtask a of e
 N.HMM.pn2pw <- function(m,mu,sigma,gamma)
 {                                              
@@ -334,7 +334,7 @@ N.HMM.pw2pn <- function(m,parvect)
   gamma  <- diag(m)                                    
   if(m>1)                                               
   {                                                  
-    gamma[!gamma] <- epar[(m+1):(m*m)]                  
+    gamma[!gamma] <- epar[(2*m+1):(m*m+m)]                  
     gamma         <- gamma/apply(gamma,1,sum)          
   }                                                   
   delta  <- solve(t(diag(m)-gamma+1),rep(1,m)) #p. 19 in HMM, solving system of equations
@@ -437,7 +437,44 @@ mle2.HMM$BIC;mle3.HMM$BIC #so we use 2 components normal HMM
 ####################################################################################################
 ###Subtask b of e
 
-
+N.HMM.mllk.mod <- function(parvect,y,n.dist,...)       
+{
+  m <- n.dist
+  findNorm <- function(theta){
+    mu<-theta[1]
+    sd<-theta[2]
+    dnorm(y,mean = mu, sd = sd)
+  }
+  #    print(parvect)
+  if(m==1) return(-sum(dnorm(y,mean=parvect[1],sd=exp(parvect[2]),log=TRUE)))
+  n          <- length(y)    
+  pn         <- N.HMM.pw2pn(m,parvect)
+  allprobs <- apply(cbind(pn$mu,pn$sigma), MARGIN = 1, FUN = findNorm)
+  #allprobs   <- outer(x,pn$mu,pn$sigma,FUN=dnorm)
+  allprobs   <- ifelse(!is.na(allprobs),allprobs,1)
+  lscale     <- 0                                    
+  foo        <- pn$delta                             
+  for (i in 1:n)                                    
+  {                                                
+    foo    <- foo%*%pn$gamma*allprobs[i,] #pn$delta = pn$delta %*% pn$gamma for i = 1. Beregning er jf. slide 14, lecture 11
+    sumfoo <- sum(foo)                               
+    lscale <- lscale+log(sumfoo)                    
+    foo    <- foo/sumfoo
+  }                                               
+  mllk       <- -lscale                            
+  mllk                                              
+}    
+wpars2.HMM.opt <- N.HMM.pn2pw(m=m, mu=mle2.HMM$mu, sigma=mle2.HMM$sigma, gamma=mle2.HMM$gamma) #seeing how it works
+H.w2.opt.HMM <- hessian(func=N.HMM.mllk.mod, x=wpars2.HMM.opt, n.dist=m, y=D$SLV)
+sd.w2.opt.HMM <- sqrt(diag(solve(H.w2.opt.HMM)))
+alpha <- 0.05
+#CI.w2.HMM.l <- wpars2.HMM.opt -1 * qnorm(1-alpha/2) * sd.w2.opt.HMM
+#CI.w2.HMM.u <- wpars2.HMM.opt + 1 * qnorm(1-alpha/2) * sd.w2.opt.HMM
+#CI.w2.HMM <- matrix(cbind(CI.w2.HMM.l,wpars2.HMM.opt,CI.w2.HMM.u),nrow=3,byrow=T)
+CI.w2.HMM <- replicate(3, wpars2.HMM.opt) + qnorm(0.975)*replicate(3, sd.w2.opt.HMM)*cbind(0,rep(-1,length(wpars2.HMM.opt)), 1)
+CI.w2.HMM <- data.frame(CI.w2.HMM, row.names=c("theta1","theta2","eta1","eta2","gamma1","gamma2"))
+colnames(CI.w2.HMM) <- c("mle","lower","upper")
+CI.w2.HMM
 ####################################################################################################
 ###Subtask c of e
 mle2.HMM$mu #mean of the two normal HMMs
@@ -506,8 +543,61 @@ HMM_sample <- N.HMM.generate_sample(length(D$SLV), m = 2, mu = mle2.HMM$mu, sigm
 ggplot(data = D)+
   geom_histogram(aes(x=SLV,colour="data"),alpha=0.3)+
   geom_histogram(aes(x=HMM_sample,colour="sample"), alpha=0.3)
-  
-k <- 100
+
+######################### SORTING SO PARAMS ARE N~##############################
+N.HMM.mllk.sort <- function(parvect,x,m,...)       
+{
+  findNorm <- function(theta){
+    mu<-theta[1]
+    sd<-theta[2]
+    dnorm(x,mean = mu, sd = sd)
+  }
+  #    print(parvect)
+  if(m==1) return(-sum(dnorm(x,mean=parvect[1],sd=exp(parvect[2]),log=TRUE)))
+  n          <- length(x)    
+  pn         <- N.HMM.pw2pn(m,parvect)
+  allprobs <- apply(cbind(pn$mu,pn$sigma), MARGIN = 1, FUN = findNorm)
+  #allprobs   <- outer(x,pn$mu,pn$sigma,FUN=dnorm)
+  allprobs   <- ifelse(!is.na(allprobs),allprobs,1)
+  lscale     <- 0                                    
+  foo        <- pn$delta                           
+  for (i in 1:n)                                    
+  {                                                
+    foo    <- foo%*%pn$gamma*allprobs[i,] #pn$delta = pn$delta %*% pn$gamma for i = 1. Beregning er jf. slide 14, lecture 11
+    sumfoo <- sum(foo)                               
+    lscale <- lscale+log(sumfoo)                    
+    foo    <- foo/sumfoo
+  }                                               
+  mllk       <- -lscale                            
+  mllk                                              
+}    
+
+N.HMM.mle.nlminb.sort <- function(x,m,mu0,sigma0,gamma0,...)
+{                                                      
+  parvect0 <- N.HMM.pn2pw(m,mu0,sigma0,gamma0)
+  np        <- length(parvect0)                          
+  lower    <- rep(-10,np)
+  upper    <- c(rep(max(x),m),rep(10,np-m))
+  mod      <- nlminb(parvect0,N.HMM.mllk.sort,x=x,m=m,
+                     lower=lower,upper=upper)
+  if(mod$convergence!=0){
+    print(mod)
+  }
+  pn       <- N.HMM.pw2pn(m,mod$par)
+  mllk     <- mod$objective
+  AIC       <- 2*(mllk+np)
+  n         <- sum(!is.na(x))
+  BIC       <- 2*mllk+np*log(n)
+  list(mu=pn$mu,sigma=pn$sigma,gamma=pn$gamma,delta=pn$delta,   
+       code=mod$convergence,mllk=mllk,AIC=AIC,BIC=BIC)   
+}
+
+
+mu <- c(0,0) * mean(D$SLV) #arbitrary
+sigma <- c(1,1) * sd(D$SLV) #arbitrary
+gamma <- matrix(c(0.5,0.5,0.5,0.5), ncol=2,byrow=T) #arbitrary
+
+k <- 200
 GAMMA <- matrix(ncol=m*m,nrow=k)
 Mu <- matrix(ncol=m,nrow=k)
 Sigma <- matrix(ncol=m,nrow=k)
@@ -519,10 +609,16 @@ for(i in 1:k){
   y.sim <- N.HMM.generate_sample(length(D$SLV), m = 2, mu = mle2.HMM$mu, sigma = mle2.HMM$sigma
                                  ,gamma = mle2.HMM$gamma, delta = mle2.HMM$delta)
   ## fit model to sample
-  mle.tmp <- N.HMM.mle.nlminb(x=y.sim, m=m, mu0=mu, sigma0=sigma, gamma0=gamma)
+  mle.tmp <- N.HMM.mle.nlminb.sort(x=y.sim, m=m, mu0=mu, sigma0=sigma, gamma0=gamma)
   ## Store result
-  GAMMA[i, ] <- c(mle.tmp$gamma[1, ],
-                  mle.tmp$gamma[2, ])
+  index <- order(mle.tmp$sigma)#TILFØJET FOR AT SORTERE!
+  mle.sort <- mle.tmp#
+  mle.sort$mu <- mle.tmp$mu[index]#
+  mle.sort$sigma <- mle.tmp$sigma[index]#
+  mle.sort$delta <- mle.tmp$delta[index]#
+  mle.tmp <- mle.sort#
+  GAMMA[i, ] <- c(mle.tmp$gamma[index[1], ],#
+                  mle.tmp$gamma[index[2], ])#
   Mu[i, ] <-  mle.tmp$mu
   Sigma[i, ] <- mle.tmp$sigma
   Delta[i, ] <-   mle.tmp$delta
@@ -531,16 +627,48 @@ for(i in 1:k){
 }
 sum(Code!=1)
 
+par(mfrow=c(1,3))
 hist(Mu)
 hist(Sigma)
 hist(Delta)
 
-quantile(Mu[1,],c(0.025,0.975)) #[-0.0017348039  0.0006418064 ] mle: 0.00109
-quantile(Mu[2,],c(0.025,0.975)) #[0.002269836 0.011556952 ] mle: 0.00183
-quantile(Sigma[1,],c(0.025,0.975))#[0.03542870 0.06235345 ] mle: 0.0317
-quantile(Sigma[2,],c(0.025,0.975)) #[0.02948821 0.05840838 ] mle: 0.0596
-quantile(Delta[1,],c(0.025,0.975)) #[0.3682242 0.6317758 ] mle: 0.353
-quantile(Delta[2,],c(0.025,0.975)) #[0.3416134 0.6583866 ] mle: 0.647
+par(mfrow=c(1,2))
+hist(Mu[,1])
+abline(v=mle2.HMM$mu[1],col=2,lwd=3)
+hist(Mu[,2])
+abline(v=mle2.HMM$mu[2],col=2,lwd=3)
 
+hist(Sigma[,1])
+abline(v=mle2.HMM$sigma[1],col=2,lwd=3)
+hist(Sigma[,2])
+abline(v=mle2.HMM$sigma[2],col=2,lwd=3)
 
+hist(Delta[,1])
+abline(v=mle2.HMM$delta[1],col=2,lwd=3)
+hist(Delta[,2])
+abline(v=mle2.HMM$delta[2],col=2,lwd=3)
+
+alpha <- 0.05
+quantile(Mu[,1],c(alpha/2, 1-alpha/2)) #[-0.00628  0.0104  ] mle: 0.00109
+quantile(Mu[,2],c(alpha/2, 1-alpha/2)) #[-0.00440  0.00948 ] mle: 0.00183
+quantile(Sigma[,1],c(alpha/2, 1-alpha/2))#[0.0248 0.0505] mle: 0.0317
+quantile(Sigma[,2],c(alpha/2, 1-alpha/2)) #[0.0494 0.0647] mle: 0.0596
+quantile(Delta[,1],c(alpha/2, 1-alpha/2)) #[0.3018 0.500 ] mle: 0.353
+quantile(Delta[,2],c(alpha/2, 1-alpha/2)) #[0.500 0.698] mle: 0.647
+
+M <- diag(m^2+m) #We expect all zeros apart from the diagonal.
+diagonal <- c(1,1,exp(wpars2.HMM.opt[3]),exp(wpars2.HMM.opt[4]),exp(wpars2.HMM.opt[5]),wpars2.HMM.opt[6])
+M <- diagonal * M
+#M <- mu1/theta1,  mu2/theta1, sigma1/theta1, sigma2/theta1, gamma1/theta1, gamma2/theta1
+  #   mu1/theta2,  mu2/theta2, sigma1/theta2, sigma2/theta2, gamma1/theta2, gamma2/theta2
+  #   mu1/eta1,    mu2/eta1,   sigma1/eta1,   sigma2/eta1,   gamma1/eta1,   gamma2/eta1
+  #   mu1/eta2,    mu2/eta2,   sigma1/eta2,   sigma2/eta2,   gamma1/eta2,   gamma2/eta2
+  #   mu1/tgamma1, mu2/tgamma, sigma1/tgamme, sigma2/tgamme, gamma1/tgamma, gamma2/tgamma
+
+invG <- t(M) %*% solve(H.w2.opt.HMM) %*% M #p. 54 in HMM
+sd.n2.opt.HMM <- sqrt(diag(invG))
+CI.n2.HMM <- replicate(3, c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta)) + qnorm(0.975)*replicate(3, sd.n2.opt.HMM)*cbind(0,rep(-1,length(c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta))), 1)
+CI.n2.HMM <- data.frame(CI.n2.HMM, row.names=c("mu1","mu2","sigma1","sigma2","delta1","delta2"))
+colnames(CI.n2.HMM) <- c("mle","lower","upper")
+CI.n2.HMM #OBS! på DELTA!
 
