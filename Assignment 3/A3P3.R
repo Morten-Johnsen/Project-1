@@ -670,5 +670,6 @@ sd.n2.opt.HMM <- sqrt(diag(invG))
 CI.n2.HMM <- replicate(3, c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta)) + qnorm(0.975)*replicate(3, sd.n2.opt.HMM)*cbind(0,rep(-1,length(c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta))), 1)
 CI.n2.HMM <- data.frame(CI.n2.HMM, row.names=c("mu1","mu2","sigma1","sigma2","delta1","delta2"))
 colnames(CI.n2.HMM) <- c("mle","lower","upper")
-CI.n2.HMM #OBS! på DELTA!
+CI.n2.HMM #OBS! på DELTA!, compare to:
+#CI.w2.HMM
 
