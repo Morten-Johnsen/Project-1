@@ -202,7 +202,7 @@ for (i in 1:3){
 }
 ####################################################################################################
 ###Subtask c of e
-##PL of one of the variance parameters of the two component model. Driller lidt :/
+##PL of one of the variance parameters of the two component model.
 #Modifying function N.nll from earlier to accept single value for on of the variances whilst optimising the others:
 N.pl <- function(eta0, n.dist, y, first=T, robust=F){ #to be used for PL of the 2nd variance parameter (working) of the 2 components normal mixture
   #if(n.dist==1){return( -sum(dnorm(y, mean=p[1], sd=exp(p[2]), log=T)))
@@ -668,8 +668,11 @@ M <- diagonal * M
 invG <- t(M) %*% solve(H.w2.opt.HMM) %*% M #p. 54 in HMM
 sd.n2.opt.HMM <- sqrt(diag(invG))
 CI.n2.HMM <- replicate(3, c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta)) + qnorm(0.975)*replicate(3, sd.n2.opt.HMM)*cbind(0,rep(-1,length(c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta))), 1)
-CI.n2.HMM <- data.frame(CI.n2.HMM, row.names=c("mu1","mu2","sigma1","sigma2","delta1","delta2"))
+CI.n2.HMM <- data.frame(CI.n2.HMM, row.names=c("mu1","mu2","sigma1","sigma2","gamma1","gamma2")) #"gamma/delta" er diag eller off-diag
 colnames(CI.n2.HMM) <- c("mle","lower","upper")
 CI.n2.HMM #OBS! på DELTA!, compare to:
 #CI.w2.HMM
+mle2.HMM$delta
+mle2.HMM$gamma
+#mle for gamma1 og gamma2 skal forstås som hhv. sandsynlighederne for at være i state 1 og blive dér og være i state 2 og blive dér.
 
