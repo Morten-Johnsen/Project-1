@@ -100,7 +100,7 @@ N.mix.pw2pn <- function(n.dist, theta, eta, tau){#theta = mu, eta = log(sigma), 
   if(length(eta) != n.dist){return("length(sigma) should be m")}
   if(length(tau) != (n.dist-1)){return("length(delta) should be m-1")}
   mu <- theta
-  sigma <- exp(eta)
+  sigma <- cumsum(exp(eta))
   delta <- exp(tau)/(1+sum(exp(tau)))
   delta <- c(1-sum(delta),delta)
   return(list(mu=mu,sigma=sigma,delta=delta))
@@ -110,7 +110,7 @@ N.nll <- function(p,n.dist,y){
   if(n.dist==1){return( -sum(dnorm(y, mean=p[1], sd=exp(p[2]), log=T)))
   }
   theta <- p[1:n.dist]
-  eta <- p[(n.dist+1):(2*n.dist)]#important to remember these parentheses
+  eta <- p[(n.dist+1):(2*n.dist)]
   tau <- p[(2*n.dist+1):(3*n.dist-1)]
   n.pars <- N.mix.pw2pn(n.dist=n.dist, theta=theta, eta=eta, tau=tau)
   n <- length(y)
@@ -119,6 +119,18 @@ N.nll <- function(p,n.dist,y){
     nll <- nll - log(sum(n.pars$delta * dnorm(y[i], mean=n.pars$mu, sd=n.pars$sigma)))
   }
   return(nll)
+}
+#####
+N.pdf <- function(x,mu,sigma){
+  return(1/(sigma*sqrt(2*pi)) * exp(-1/2 * (x-mu)^2/sigma^2))
+}
+
+final.Dist <- function(x, delta, mu, sigma){
+  L <- 0
+  for (i in 1:length(delta)){
+    L <- L + delta[i] * N.pdf(x, mu[i], sigma[i])
+  }
+  return(L)
 }
 ##################################################
 m <- 1 # 1 components
@@ -145,6 +157,7 @@ wpars <- N.mix.pn2pw(n.dist=m, mu=mu, sigma=sigma, delta=delta)
 p <- c(wpars$theta, wpars$eta, wpars$tau)
 N.nll(p=p, n.dist=m, y=D$SLV)
 opt2 <- nlminb(start=p, N.nll, n.dist=m, y=D$SLV)
+#opt2$par[(m+1+1):(2*m)] = opt2$par[(m+1):(2*m-1)] + exp(opt2$par[(m+1+1):(2*m)])
 (pars2 <- N.mix.pw2pn(n.dist=m,opt2$par[1:m],opt2$par[(m+1):(2*m)],opt2$par[(2*m+1):(3*m-1)]))
 ggplot(D)+
   geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
@@ -153,6 +166,13 @@ ggplot(D)+
   stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = pars2$mu[2],
                                                         sd = pars2$sigma[2]), color = 'orange') +
   ggtitle("Normal distribution fitted to SLV")
+
+D$interval <- seq(min(D$SLV), max(D$SLV), length.out = length(D$SLV))
+D$dist2 <- sapply(D$interval, final.Dist, delta = pars2$delta, mu = pars2$mu, sigma = pars2$sigma)
+ggplot(D)+
+  geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
+  geom_line(aes(x = interval, y = dist2), colour = "blue")+
+  ggtitle("(2) Normal distribution fitted to SLV")
 #with delta = 0.91, 0.09 for red, orange
 ##################################################
 m <- 3 #3 components
@@ -163,7 +183,10 @@ wpars <- N.mix.pn2pw(n.dist=m, mu=mu, sigma=sigma, delta=delta)
 ( N.mix.pw2pn(n.dist=m, theta=wpars$theta, eta=wpars$eta, tau=wpars$tau) ) #checking that pn2pw -> pw2pn works
 p <- c(wpars$theta, wpars$eta, wpars$tau)
 N.nll(p=p, n.dist=m, y=D$SLV)
-opt3 <- nlminb(start=p, N.nll, n.dist=m, y=D$SLV)
+opt3 <- nlminb(start=c(wpars$theta, wpars$eta, wpars$tau), N.nll, n.dist=m, y=D$SLV)
+opt3$par
+#opt3$par[(m+1+1):(2*m)] = opt3$par[(m+1):(2*m-1)] + cumsum(exp(opt3$par[(m+1+1):(2*m)]))
+#opt3$par
 (pars3 <- N.mix.pw2pn(n.dist=m,opt3$par[1:m],opt3$par[(m+1):(2*m)],opt3$par[(2*m+1):(3*m-1)]))
 ggplot(D)+
   geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
@@ -174,6 +197,13 @@ ggplot(D)+
   stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = pars3$mu[3],
                                                         sd = pars3$sigma[3]), color = 'blue') +
   ggtitle("Normal distribution fitted to SLV")
+
+D$interval <- seq(min(D$SLV), max(D$SLV), length.out = length(D$SLV))
+D$dist3 <- sapply(D$interval, final.Dist, delta = pars3$delta, mu = pars3$mu, sigma = pars3$sigma)
+ggplot(D)+
+  geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
+  geom_line(aes(x = interval, y = dist3), colour = "blue")+
+  ggtitle("(3) Normal distribution fitted to SLV")
 #with delta = 0.83, 0.06, 0.10, for red, orange, blue
 ##################################################
 #comparing the nlls of the lts and the three normal dists:
@@ -195,16 +225,19 @@ m <- 2
 alpha <- 0.05
 V.w2 <- diag(solve( hessian(func=N.nll, x=opt2$par, n.dist=m, y=D$SLV) ))
 CIs.w2 <- matrix(c(opt2$par-qnorm(1-alpha/2)*sqrt(V.w2), opt2$par, opt2$par+qnorm(1-alpha/2)*sqrt(V.w2)), nrow=3, byrow=T) #1st: lower, 2nd: MLE, 3rd: upper
-CIs.n2 <- matrix(rep(0,( dim(CIs.w2)[1] * ( dim(CIs.w2)[2]+1 ) ) ), nrow=3, byrow=T)
-for (i in 1:3){
-  n2_temp <- N.mix.pw2pn(n.dist=m, theta=CIs.w2[i,(1:m)], eta=CIs.w2[i,(m+1):(2*m)], tau=CIs.w2[i,(2*m+1):(3*m-1)])
-  CIs.n2[i,1:dim(CIs.n2)[2]] <- c(n2_temp$mu, n2_temp$sigma, n2_temp$delta) #1st: lower, 2nd: MLE, 3rd: upper
-}
+CIs.w2 <- data.frame(CIs.w2, row.names=c("lower","mle","upper"))
+colnames(CIs.w2) = c("theta1", "theta2", "eta1", "eta2", "tau")
+#CIs.n2 <- matrix(rep(0,( dim(CIs.w2)[1] * ( dim(CIs.w2)[2]+1 ) ) ), nrow=3, byrow=T)
+#for (i in 1:3){
+#  n2_temp <- N.mix.pw2pn(n.dist=m, theta=CIs.w2[i,(1:m)], eta=CIs.w2[i,(m+1):(2*m)], tau=CIs.w2[i,(2*m+1):(3*m-1)])
+#  CIs.n2[i,1:dim(CIs.n2)[2]] <- c(n2_temp$mu, n2_temp$sigma, n2_temp$delta) #1st: lower, 2nd: MLE, 3rd: upper
+#}
+
 ####################################################################################################
 ###Subtask c of e
 ##PL of one of the variance parameters of the two component model.
 #Modifying function N.nll from earlier to accept single value for on of the variances whilst optimising the others:
-N.pl <- function(eta0, n.dist, y, first=T, robust=F){ #to be used for PL of the 2nd variance parameter (working) of the 2 components normal mixture
+N.pl <- function(eta0, n.dist, y, first=T){ #to be used for PL of the 2nd variance parameter (working) of the 2 components normal mixture
   #if(n.dist==1){return( -sum(dnorm(y, mean=p[1], sd=exp(p[2]), log=T)))
   #}
   nll_temp <- function(p, n.dist=n.dist, y=y, eta0=eta0, bool=first){ #only works m = 2
@@ -236,9 +269,6 @@ N.pl <- function(eta0, n.dist, y, first=T, robust=F){ #to be used for PL of the 
   } else{
     n.pars2_temp <- N.mix.pw2pn(n.dist=m,opt2_temp$par[1:m],c(opt2_temp$par[(m+1)], eta0),opt2_temp$par[(2*m+1):(3*m-1)])
   }
-  if(robust){
-    n.pars2_temp$sigma = sort(n.pars2_temp$sigma)
-  }
   n <- length(y)
   ll <- 0
   for (i in 1:n){
@@ -248,11 +278,11 @@ N.pl <- function(eta0, n.dist, y, first=T, robust=F){ #to be used for PL of the 
 }
 
 eta1.w <- seq(opt2$par[m+1]-6*sqrt(V.w2)[m+1],
-              opt2$par[m+1]+30*sqrt(V.w2)[m+1],
-              length=25)
+              opt2$par[m+1]+6*sqrt(V.w2)[m+1],
+              length=50)
 eta2.w <- seq(opt2$par[2*m]-6*sqrt(V.w2)[2*m],
              opt2$par[2*m]+6*sqrt(V.w2)[2*m],
-            length=25)
+            length=50)
 m <- 2
 N.llp <- sapply(X = eta1.w, FUN=N.pl, n.dist=m, y=D$SLV)
 N.llp2 <- sapply(X = eta2.w, FUN=N.pl, n.dist=m, y=D$SLV, first=F)
@@ -279,24 +309,9 @@ abline(v=opt2$par[m+1], col="red")
 
 ####################################################################################################
 ###Subtask d of e
-N.llp.rep <- sapply(X = eta1.w, FUN=N.pl, n.dist=m, y=D$SLV, robust=T)
-N.llp2.rep <- sapply(X = eta2.w, FUN=N.pl, n.dist=m, y=D$SLV, first=F, robust=T)
+#see above
 
-plot(eta1.w,exp(N.llp.rep-(max(N.llp.rep))),type="l",
-     main = "Profile likelihood of FIRST variance param of 2 component norm mixture dist") #smart Jan-plot
-lines(range(eta1.w),
-      exp(-c(1,1) * qchisq(0.95,df=1)/2),
-      col=2,lty=2)
-abline(v=opt2$par[m+1], col="red") #first MLE var
-abline(v=opt2$par[2*m], col="blue") # second MLE var
 
-plot(eta2.w,exp(N.llp2.rep-(max(N.llp2.rep))),type="l",
-     main = "Profile likelihood of SECOND variance param of 2 component norm mixture dist") #smart Jan-plot
-lines(range(eta2.w),
-      exp(-c(1,1) * qchisq(0.95,df=1)/2),
-      col=2,lty=2)
-abline(v=opt2$par[2*m], col="blue")
-abline(v=opt2$par[m+1], col="red")
 ####################################################################################################
 ###Subtask e of e
 
@@ -597,7 +612,7 @@ mu <- c(0,0) * mean(D$SLV) #arbitrary
 sigma <- c(1,1) * sd(D$SLV) #arbitrary
 gamma <- matrix(c(0.5,0.5,0.5,0.5), ncol=2,byrow=T) #arbitrary
 
-k <- 200
+k <- 20
 GAMMA <- matrix(ncol=m*m,nrow=k)
 Mu <- matrix(ncol=m,nrow=k)
 Sigma <- matrix(ncol=m,nrow=k)
@@ -656,23 +671,23 @@ quantile(Sigma[,2],c(alpha/2, 1-alpha/2)) #[0.0494 0.0647] mle: 0.0596
 quantile(Delta[,1],c(alpha/2, 1-alpha/2)) #[0.3018 0.500 ] mle: 0.353
 quantile(Delta[,2],c(alpha/2, 1-alpha/2)) #[0.500 0.698] mle: 0.647
 
-M <- diag(m^2+m) #We expect all zeros apart from the diagonal.
-diagonal <- c(1,1,exp(wpars2.HMM.opt[3]),exp(wpars2.HMM.opt[4]),exp(wpars2.HMM.opt[5]),wpars2.HMM.opt[6])
-M <- diagonal * M
-#M <- mu1/theta1,  mu2/theta1, sigma1/theta1, sigma2/theta1, gamma1/theta1, gamma2/theta1
-  #   mu1/theta2,  mu2/theta2, sigma1/theta2, sigma2/theta2, gamma1/theta2, gamma2/theta2
-  #   mu1/eta1,    mu2/eta1,   sigma1/eta1,   sigma2/eta1,   gamma1/eta1,   gamma2/eta1
-  #   mu1/eta2,    mu2/eta2,   sigma1/eta2,   sigma2/eta2,   gamma1/eta2,   gamma2/eta2
-  #   mu1/tgamma1, mu2/tgamma, sigma1/tgamme, sigma2/tgamme, gamma1/tgamma, gamma2/tgamma
-
-invG <- t(M) %*% solve(H.w2.opt.HMM) %*% M #p. 54 in HMM
-sd.n2.opt.HMM <- sqrt(diag(invG))
-CI.n2.HMM <- replicate(3, c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta)) + qnorm(0.975)*replicate(3, sd.n2.opt.HMM)*cbind(0,rep(-1,length(c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta))), 1)
-CI.n2.HMM <- data.frame(CI.n2.HMM, row.names=c("mu1","mu2","sigma1","sigma2","gamma1","gamma2")) #"gamma/delta" er diag eller off-diag
-colnames(CI.n2.HMM) <- c("mle","lower","upper")
-CI.n2.HMM #OBS! på DELTA!, compare to:
-#CI.w2.HMM
-mle2.HMM$delta
-mle2.HMM$gamma
-#mle for gamma1 og gamma2 skal forstås som hhv. sandsynlighederne for at være i state 1 og blive dér og være i state 2 og blive dér.
+# M <- diag(m^2+m) #We expect all zeros apart from the diagonal.
+# diagonal <- c(1,1,exp(wpars2.HMM.opt[3]),exp(wpars2.HMM.opt[4]),exp(wpars2.HMM.opt[5]),wpars2.HMM.opt[6])
+# M <- diagonal * M
+# #M <- mu1/theta1,  mu2/theta1, sigma1/theta1, sigma2/theta1, gamma1/theta1, gamma2/theta1
+#   #   mu1/theta2,  mu2/theta2, sigma1/theta2, sigma2/theta2, gamma1/theta2, gamma2/theta2
+#   #   mu1/eta1,    mu2/eta1,   sigma1/eta1,   sigma2/eta1,   gamma1/eta1,   gamma2/eta1
+#   #   mu1/eta2,    mu2/eta2,   sigma1/eta2,   sigma2/eta2,   gamma1/eta2,   gamma2/eta2
+#   #   mu1/tgamma1, mu2/tgamma, sigma1/tgamme, sigma2/tgamme, gamma1/tgamma, gamma2/tgamma
+# 
+# invG <- t(M) %*% solve(H.w2.opt.HMM) %*% M #p. 54 in HMM
+# sd.n2.opt.HMM <- sqrt(diag(invG))
+# CI.n2.HMM <- replicate(3, c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta)) + qnorm(0.975)*replicate(3, sd.n2.opt.HMM)*cbind(0,rep(-1,length(c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta))), 1)
+# CI.n2.HMM <- data.frame(CI.n2.HMM, row.names=c("mu1","mu2","sigma1","sigma2","gamma1","gamma2")) #"gamma/delta" er diag eller off-diag
+# colnames(CI.n2.HMM) <- c("mle","lower","upper")
+# CI.n2.HMM #OBS! på DELTA!, compare to:
+# #CI.w2.HMM
+# mle2.HMM$delta
+# mle2.HMM$gamma
+# #mle for gamma1 og gamma2 skal forstås som hhv. sandsynlighederne for at være i state 1 og blive dér og være i state 2 og blive dér.
 
