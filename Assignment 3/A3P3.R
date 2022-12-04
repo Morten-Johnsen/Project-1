@@ -233,6 +233,72 @@ colnames(CIs.w2) = c("theta1", "theta2", "eta1", "eta2", "tau")
 #  CIs.n2[i,1:dim(CIs.n2)[2]] <- c(n2_temp$mu, n2_temp$sigma, n2_temp$delta) #1st: lower, 2nd: MLE, 3rd: upper
 #}
 
+## parametric bootstrap ##
+rmix.normal <- function(k,delta,mu,sigma){
+  states <- sample(1:length(delta),size=k,replace=TRUE,
+                   prob=delta)
+  return(rnorm(k, mean = mu[states], sd = sigma[states]))
+}
+
+#### Run for new mixture model parametric bootstraps
+# k <- length(D$SLV)
+# m <- 3
+# mu0 <- c(1/2,0,-1/2)*mean(D$SLV)
+# sigma0 <- c(1,2,5)*sd(D$SLV)
+# delta0 <- c(0.34,0.33) #fifty-fifty for the two dists
+# wpars0 <- N.mix.pn2pw(n.dist=m, mu=mu0, sigma=sigma0, delta=delta0)
+# 
+# runs_for_parametric_bootstrap <- 2000
+# 
+# Mu <- matrix(ncol=m,nrow=runs_for_parametric_bootstrap)
+# Sigma <- matrix(ncol=m,nrow=runs_for_parametric_bootstrap)
+# Delta <- matrix(ncol=m,nrow=runs_for_parametric_bootstrap)
+# Code <- numeric(runs_for_parametric_bootstrap)
+# 
+# for(i in 1:runs_for_parametric_bootstrap){
+#   set.seed(i)
+#   ## generate sample
+#   y.sim <- rmix.normal(k, delta = pars2$delta, mu = pars2$mu, sigma = pars2$sigma)
+#   ## fit model to sample
+#   p <- c(wpars0$theta, wpars0$eta, wpars0$tau)
+#   opt2.tmp <- nlminb(start=p, N.nll, n.dist=m, y=y.sim)
+#   pars2.tmp <- N.mix.pw2pn(n.dist=m, opt2.tmp$par[1:m], opt2.tmp$par[(m+1):(2*m)], opt2.tmp$par[(2*m+1):(3*m-1)])
+# 
+#   ## Store result
+#   Mu[i, ] <-  pars2.tmp$mu
+#   Sigma[i, ] <- pars2.tmp$sigma
+#   Delta[i, ] <-   pars2.tmp$delta
+#   Code[i] <-      opt2.tmp$convergence
+#   print(c(i,Code[i]))
+# }
+# sum(Code!=1)
+#save(Mu, Sigma, Delta, Code, file = "./3MixtureModelParametricBootstrap2000.Rdata")
+load("./MixtureModelParametricBootstrap2000.Rdata")
+melt(data.frame("Mu1" = Mu[Code!=1,1], "Mu2" = Mu[Code!=1,2])) %>%
+  union(melt(data.frame("Sigma1" = Sigma[Code!=1,1], "Sigma2" = Sigma[Code!=1,2]))) %>%
+  union(melt(data.frame("Delta1" = Delta[Code!=1,1], "Delta2" = Delta[Code!=1,2]))) %>%
+  ggplot()+
+  geom_histogram(aes(x = value), colour = "white")+
+  facet_wrap(~variable, scales =  "free")
+
+#load("./3MixtureModelParametricBootstrap2000.Rdata")
+# melt(data.frame("Mu1" = Mu[Code!=1,1], "Mu2" = Mu[Code!=1,2], "Mu3" = Mu[Code!=1,3])) %>%
+#   union(melt(data.frame("Sigma1" = Sigma[Code!=1,1], "Sigma2" = Sigma[Code!=1,2], "Sigma3" = Sigma[Code!=1,3]))) %>%
+#   union(melt(data.frame("Delta1" = Delta[Code!=1,1], "Delta2" = Delta[Code!=1,2], "Delta3" = Delta[Code!=1,3]))) %>%
+#   ggplot()+
+#   geom_histogram(aes(x = value), colour = "white")+
+#   facet_wrap(~variable, scales =  "free")
+
+ParametricBootCI <- data.frame(round(cbind(c(pars2$mu, pars2$sigma, pars2$delta),
+            rbind(quantile(Mu[ ,1],prob=c(0.025,0.975)),
+            quantile(Mu[ ,2],prob=c(0.025,0.975)),
+            quantile(Sigma[ ,1],prob=c(0.025,0.975)),
+            quantile(Sigma[ ,2],prob=c(0.025,0.975)),
+            quantile(Delta[ ,1],prob=c(0.025,0.975)),
+            quantile(Delta[ ,2],prob=c(0.025,0.975)))),
+      digits = 5)); colnames(ParametricBootCI) <- c("MLE", "2.5%", "97.5%"); rownames(ParametricBootCI) <- c("Mu1", "Mu2", "Sigma1", "Sigma2", "Delta1", "Delta2")
+ParametricBootCI[,c(2,1,3)]
+
 ####################################################################################################
 ###Subtask c of e
 ##PL of one of the variance parameters of the two component model.
