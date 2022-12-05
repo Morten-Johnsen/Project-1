@@ -299,6 +299,15 @@ ParametricBootCI <- data.frame(round(cbind(c(pars2$mu, pars2$sigma, pars2$delta)
       digits = 5)); colnames(ParametricBootCI) <- c("MLE", "2.5%", "97.5%"); rownames(ParametricBootCI) <- c("Mu1", "Mu2", "Sigma1", "Sigma2", "Delta1", "Delta2")
 ParametricBootCI[,c(2,1,3)]
 
+#Interpretations:
+#Der er grundlæggende sæt to fordelinger som dataene kommer fra
+#én med nær-positiv gennemsnit of smal varians, og én med primært negativ gennemsnit
+#og bred varians. Ca. 90 af observationerne kommer fra den positive, smalle fordeling.
+#Dvs. vi bruger 90% af tiden i den mindre volatile fordeling, hvor der er svag evidens
+#for at udviklingen er positiv - det er dog ikke muligt på at 95% confidens-niveau at sige at gennemsnittet for fordeling
+#1 er positiv og heller ikke om gennemsnittet af den anden (mere volatile) fordeling
+#er negativ.
+
 ####################################################################################################
 ###Subtask c of e
 ##PL of one of the variance parameters of the two component model.
@@ -380,7 +389,8 @@ abline(v=opt2$par[m+1], col="red")
 
 ####################################################################################################
 ###Subtask e of e
-
+#Model interpretation:
+#See above interpreations from b of e regarding two states: growth, less-volatile and volatile (and possibly decreasing).
 
 ####################################################################################################
 ####################################################################################################
@@ -411,7 +421,7 @@ N.HMM.pw2pn <- function(m,parvect)
 {                                                     
   epar   <- exp(parvect)   
   mu <- parvect[1:m]
-  sigma <- epar[(m+1):(2*m)]
+  sigma <- cumsum(epar[(m+1):(2*m)])
   gamma  <- diag(m)                                    
   if(m>1)                                               
   {                                                  
@@ -580,7 +590,7 @@ final.Dist <- function(x){
 par(mfrow = c(1,1))
 interval <- seq(min(D$SLV), max(D$SLV), length.out = length(D$SLV))
 ggplot(D)+
-  geom_histogram(aes(x = SLV, y=..density..))+
+  geom_histogram(aes(x = SLV, y=..density..), colour = "white")+
   geom_line(aes(x = interval, y = final.Dist(interval)))
 plot(interval, final.Dist(interval), "l")
 
@@ -596,8 +606,8 @@ givenState2 <- function(x){
 
 ggplot(D)+
   geom_histogram(aes(x = SLV, y=..density..), colour = "white")+
-  geom_line(aes(x = interval, y = givenState1(interval), colour = "Given state 1"))+
-  geom_line(aes(x = interval, y = givenState2(interval), colour = "Given state 2"))+
+  geom_line(aes(x = interval, y = givenState1(interval), colour = "One-step ahead Given state 1"))+
+  geom_line(aes(x = interval, y = givenState2(interval), colour = "One-step ahead Given state 2"))+
   #geom_line(aes(x = interval, y = givenState2(interval)*mle2.HMM$delta[2] + givenState1(interval)*mle2.HMM$delta[1], colour = "Testt stonks"), size = 2)+
   geom_line(aes(x = interval, y = final.Dist(interval), colour = "Long term returns"))+
   scale_colour_manual(values = c("darkgreen", "red", "orange", "purple"))+
@@ -622,63 +632,15 @@ N.HMM.generate_sample <- function(n,m,mu,sigma,gamma,delta=NULL)
 HMM_sample <- N.HMM.generate_sample(length(D$SLV), m = 2, mu = mle2.HMM$mu, sigma = mle2.HMM$sigma
                                     ,gamma = mle2.HMM$gamma, delta = mle2.HMM$delta)
 ggplot(data = D)+
-  geom_histogram(aes(x=SLV,colour="data"),alpha=0.3)+
-  geom_histogram(aes(x=HMM_sample,colour="sample"), alpha=0.3)
+  geom_line(aes(x = date, y=SLV,colour="data"),alpha=0.8, size = 1)+
+  geom_line(aes(x = date, y=HMM_sample,colour="sample"), alpha=0.8, size = 1)
 
-######################### SORTING SO PARAMS ARE N~##############################
-N.HMM.mllk.sort <- function(parvect,x,m,...)       
-{
-  findNorm <- function(theta){
-    mu<-theta[1]
-    sd<-theta[2]
-    dnorm(x,mean = mu, sd = sd)
-  }
-  #    print(parvect)
-  if(m==1) return(-sum(dnorm(x,mean=parvect[1],sd=exp(parvect[2]),log=TRUE)))
-  n          <- length(x)    
-  pn         <- N.HMM.pw2pn(m,parvect)
-  allprobs <- apply(cbind(pn$mu,pn$sigma), MARGIN = 1, FUN = findNorm)
-  #allprobs   <- outer(x,pn$mu,pn$sigma,FUN=dnorm)
-  allprobs   <- ifelse(!is.na(allprobs),allprobs,1)
-  lscale     <- 0                                    
-  foo        <- pn$delta                           
-  for (i in 1:n)                                    
-  {                                                
-    foo    <- foo%*%pn$gamma*allprobs[i,] #pn$delta = pn$delta %*% pn$gamma for i = 1. Beregning er jf. slide 14, lecture 11
-    sumfoo <- sum(foo)                               
-    lscale <- lscale+log(sumfoo)                    
-    foo    <- foo/sumfoo
-  }                                               
-  mllk       <- -lscale                            
-  mllk                                              
-}    
-
-N.HMM.mle.nlminb.sort <- function(x,m,mu0,sigma0,gamma0,...)
-{                                                      
-  parvect0 <- N.HMM.pn2pw(m,mu0,sigma0,gamma0)
-  np        <- length(parvect0)                          
-  lower    <- rep(-10,np)
-  upper    <- c(rep(max(x),m),rep(10,np-m))
-  mod      <- nlminb(parvect0,N.HMM.mllk.sort,x=x,m=m,
-                     lower=lower,upper=upper)
-  if(mod$convergence!=0){
-    print(mod)
-  }
-  pn       <- N.HMM.pw2pn(m,mod$par)
-  mllk     <- mod$objective
-  AIC       <- 2*(mllk+np)
-  n         <- sum(!is.na(x))
-  BIC       <- 2*mllk+np*log(n)
-  list(mu=pn$mu,sigma=pn$sigma,gamma=pn$gamma,delta=pn$delta,   
-       code=mod$convergence,mllk=mllk,AIC=AIC,BIC=BIC)   
-}
-
-
+#PARAMETRIC BOOTSTRAP
 mu <- c(0,0) * mean(D$SLV) #arbitrary
 sigma <- c(1,1) * sd(D$SLV) #arbitrary
 gamma <- matrix(c(0.5,0.5,0.5,0.5), ncol=2,byrow=T) #arbitrary
 
-k <- 20
+k <- 2000
 GAMMA <- matrix(ncol=m*m,nrow=k)
 Mu <- matrix(ncol=m,nrow=k)
 Sigma <- matrix(ncol=m,nrow=k)
@@ -690,16 +652,10 @@ for(i in 1:k){
   y.sim <- N.HMM.generate_sample(length(D$SLV), m = 2, mu = mle2.HMM$mu, sigma = mle2.HMM$sigma
                                  ,gamma = mle2.HMM$gamma, delta = mle2.HMM$delta)
   ## fit model to sample
-  mle.tmp <- N.HMM.mle.nlminb.sort(x=y.sim, m=m, mu0=mu, sigma0=sigma, gamma0=gamma)
-  ## Store result
-  index <- order(mle.tmp$sigma)#TILFØJET FOR AT SORTERE!
-  mle.sort <- mle.tmp#
-  mle.sort$mu <- mle.tmp$mu[index]#
-  mle.sort$sigma <- mle.tmp$sigma[index]#
-  mle.sort$delta <- mle.tmp$delta[index]#
-  mle.tmp <- mle.sort#
-  GAMMA[i, ] <- c(mle.tmp$gamma[index[1], ],#
-                  mle.tmp$gamma[index[2], ])#
+  mle.tmp <- N.HMM.mle.nlminb(x=y.sim, m=m, mu0=mu, sigma0=sigma, gamma0=gamma)
+  ## Store resultater
+  GAMMA[i, ] <- c(mle.tmp$gamma[1, ],#
+                  mle.tmp$gamma[2, ])#
   Mu[i, ] <-  mle.tmp$mu
   Sigma[i, ] <- mle.tmp$sigma
   Delta[i, ] <-   mle.tmp$delta
@@ -707,35 +663,34 @@ for(i in 1:k){
   print(c(i,Code[i]))
 }
 sum(Code!=1)
+save(Mu, Sigma, Delta, Code, GAMMA, file = "./HMMBOot2States.Rdata")
 
-par(mfrow=c(1,3))
-hist(Mu)
-hist(Sigma)
-hist(Delta)
+melt(data.frame("Mu1" = Mu[Code!=1,1], "Mu2" = Mu[Code!=1,2])) %>%
+  union(melt(data.frame("Sigma1" = Sigma[Code!=1,1], "Sigma2" = Sigma[Code!=1,2]))) %>%
+  union(melt(data.frame("Delta1" = Delta[Code!=1,1], "Delta2" = Delta[Code!=1,2]))) %>%
+  union(melt(data.frame("Gamma11" = GAMMA[Code!=1,1], "Gamma22" = GAMMA[Code!=1,4]))) %>%
+  ggplot()+
+  geom_histogram(aes(x = value), colour = "white")+
+  facet_wrap(~variable, scales =  "free")
 
-par(mfrow=c(1,2))
-hist(Mu[,1])
-abline(v=mle2.HMM$mu[1],col=2,lwd=3)
-hist(Mu[,2])
-abline(v=mle2.HMM$mu[2],col=2,lwd=3)
 
-hist(Sigma[,1])
-abline(v=mle2.HMM$sigma[1],col=2,lwd=3)
-hist(Sigma[,2])
-abline(v=mle2.HMM$sigma[2],col=2,lwd=3)
-
-hist(Delta[,1])
-abline(v=mle2.HMM$delta[1],col=2,lwd=3)
-hist(Delta[,2])
-abline(v=mle2.HMM$delta[2],col=2,lwd=3)
-
-alpha <- 0.05
-quantile(Mu[,1],c(alpha/2, 1-alpha/2)) #[-0.00628  0.0104  ] mle: 0.00109
-quantile(Mu[,2],c(alpha/2, 1-alpha/2)) #[-0.00440  0.00948 ] mle: 0.00183
-quantile(Sigma[,1],c(alpha/2, 1-alpha/2))#[0.0248 0.0505] mle: 0.0317
-quantile(Sigma[,2],c(alpha/2, 1-alpha/2)) #[0.0494 0.0647] mle: 0.0596
-quantile(Delta[,1],c(alpha/2, 1-alpha/2)) #[0.3018 0.500 ] mle: 0.353
-quantile(Delta[,2],c(alpha/2, 1-alpha/2)) #[0.500 0.698] mle: 0.647
+ParametricBootCI <- data.frame(round(cbind(c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta, c(mle2.HMM$gamma[1,],mle2.HMM$gamma[2,])),
+                                           rbind(quantile(Mu[ ,1],prob=c(0.025,0.975)),
+                                                 quantile(Mu[ ,2],prob=c(0.025,0.975)),
+                                                 quantile(Sigma[ ,1],prob=c(0.025,0.975)),
+                                                 quantile(Sigma[ ,2],prob=c(0.025,0.975)),
+                                                 quantile(Delta[ ,1],prob=c(0.025,0.975)),
+                                                 quantile(Delta[ ,2],prob=c(0.025,0.975)),
+                                                 quantile(GAMMA[ ,1],prob=c(0.025,0.975)),
+                                                 quantile(GAMMA[ ,2],prob=c(0.025,0.975)),
+                                                 quantile(GAMMA[ ,3],prob=c(0.025,0.975)),
+                                                 quantile(GAMMA[ ,4],prob=c(0.025,0.975)))),
+                                     digits = 5)); colnames(ParametricBootCI) <- c("MLE", "2.5%", "97.5%"); rownames(ParametricBootCI) <- c("Mu1", "Mu2",
+                                                                                                                                            "Sigma1", "Sigma2",
+                                                                                                                                            "Delta1", "Delta2",
+                                                                                                                                            "GAMMA11", "GAMMA12",
+                                                                                                                                            "GAMMA21", "GAMMA22")
+ParametricBootCI[,c(2,1,3)]
 
 # M <- diag(m^2+m) #We expect all zeros apart from the diagonal.
 # diagonal <- c(1,1,exp(wpars2.HMM.opt[3]),exp(wpars2.HMM.opt[4]),exp(wpars2.HMM.opt[5]),wpars2.HMM.opt[6])
