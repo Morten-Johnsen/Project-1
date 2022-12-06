@@ -116,13 +116,10 @@ columns <- dim(log.data)[2]-1 #-1 because of the AZT column
 cat(paste("chi_squared test statistic: ", chi_squared_yates, "\nP-value: ", pchisq(chi_squared_yates,df=(rows-1)*(columns-1),lower.tail=FALSE),
           "\nThus there is a significant difference between the two groups. "))
 ### Result: There's a difference between the two groups.
+```
 
-#### direct test of proportions using R: ####
-#log.data.for.chi <- log.data; log.data.for.chi$f <- log.data.for.chi$n - log.data.for.chi$AIDS_yes
-#prop.test(log.data$AIDS_yes, log.data$n)
-#or
-#chisq.test(as.matrix(log.data.for.chi[,c(2,4)]))
 
+```{r}
 #Likelihood-metode: #KOMMENTAR:START se ca. 30 linjer nede for "KOMMENTAR:SLUT"
 x1 <- log.data$AIDS_yes[1]
 x2 <- log.data$AIDS_yes[2]
@@ -143,7 +140,7 @@ L <- function(theta){
   return(-log(exp(theta*x1+eta.hat*(x1+x2))/((1+exp(theta+eta.hat))^n1*(1+exp(eta.hat))^n2)))
 }
 
-theta.hat <- nlminb(start = 1, objective = L)$par
+(theta.hat <- nlminb(start = 1, objective = L)$par)
 
 var <- solve(hessian(func <- L, x = theta.hat))
 sd <- as.numeric(sqrt(var))
@@ -154,7 +151,7 @@ H.L.theta <- hessian(func = L, x = theta.hat)
 V.L.theta <- solve(H.L.theta)
 CI.theta <- theta.hat + c(-1,1) * qnorm(0.975) * sqrt(V.L.theta)
 #KOMMENTAR:SLUT. Dette CI.theta kan vel bruges til at sige noget om, at da det ikke indeholder 0, så må effekten være signifikant?
-#Det virker rigtigt. Hvilket slide/hvilken side i bogen er brugt? Slide 22, uge 4. Her er pi_1 = x1/n1 og pi_2 = x2/n2.
+#Det virker rigtigt. Hvilket slide/hvilken side i bogen er brugt? Slide 22, uge 3. Her er pi_1 = x1/n1 og pi_2 = x2/n2.
 ```
 
 Result: By means of the usual non-likelihood method of proportion testing it has been shown that there is a statistically significant effect of the treatment.
@@ -177,8 +174,8 @@ hessian.p1 <- hessian(func = pf.p, x = AZT.par$par, y = c(x.AZT[1], x.AZT[2]))
 sd.p1 <- sqrt(diag(solve(hessian.p1)))
 CI.p1 <- AZT.par$par + c(-1,1)*qnorm(0.975)*sd.p1
 
-print(cat("MLE of p_1 and 95% CI for group with AZT treatment: ", round(AZT.par$par,3), " [",round(CI.p1,3)[1],"; ",round(CI.p1,3)[2],"]"
-      ,"\nMLE of p_0 and 95% CI for group with no AZT treatment: ", round(no.AZT.par$par,3), " [",round(CI.p0,3)[1],"; ",round(CI.p0,3)[2],"]"))
+cat("MLE of p_1 and 95% CI for group with AZT treatment: ", round(AZT.par$par,3), " [",round(CI.p1,3)[1],"; ",round(CI.p1,3)[2],"]"
+      ,"\nMLE of p_0 and 95% CI for group with no AZT treatment: ", round(no.AZT.par$par,3), " [",round(CI.p0,3)[1],"; ",round(CI.p0,3)[2],"]")
 ```
 
 ```{r, warnings = F, messages = F}
@@ -543,9 +540,10 @@ beta_hat <- nlminb(start = c(1,1)
                    , event = actg$event
                    , treatment = actg$tx)
 beta_hat$par
+```
 
 
-#Comparing likelihoods with the result from bullet-point 4
+```{r, fig.height=7}
 beta_hat$objective #Ved ikke lige om der skal sammenlignes med de to modeller eller den ene? ahh
 #måske skal man undersøge om begge værdier er statistisk signifikante således at vi kan argumentere for
 #at der er tale om at behandlingen virker og sammenligne dette resultat med bullet-point 4.
@@ -559,7 +557,12 @@ beta_no_treatment_effect <- nlminb(start = 1
                                    , treatment = rep(0, length(actg$tx)))
 
 beta_no_treatment_effect$par
+#Comparing MLEs with previous result
+exp(cumsum(beta_hat$par)); theta.hat.tx; theta.hat.no.tx; theta.hat.both; exp(beta_no_treatment_effect$par)
+```
 
+
+```{r, fig.height=7}
 #LRT:
 chi_squared <- - 2 * (beta_hat$objective - beta_no_treatment_effect$objective)
 (p_value <- 1 - pchisq(chi_squared, df = 1))
@@ -612,7 +615,7 @@ sd <- c(sqrt(V_nuis), sqrt(V_tr))
 sd.former <- as.numeric(sqrt(diag(solve(hessian(beta_hat$par, func = nll.exp)))))
 sd;sd.former
 
-Wald.CI_former <- beta_hat$par + matrix(c(-1,1), 2,2, byrow = T) * matrix(qnorm(0.975)*sd.former, 2,2, byrow = F)
+Wald.CI_former <- round(beta_hat$par + matrix(c(-1,1), 2,2, byrow = T) * matrix(qnorm(0.975)*sd.former, 2,2, byrow = F), 3)
 
 #Direkte numerisk approksimation:
 CI.0 <- c(min(beta.zero.sims[-(pL.beta0+max(-pL.beta0)) > -qchisq(0.95, df = 1)/2])
@@ -621,8 +624,8 @@ CI.1 <- c(min(beta.one.sims[-(pL.beta1+max(-pL.beta1)) > -qchisq(0.95, df = 1)/2
            ,max(beta.one.sims[-(pL.beta1+max(-pL.beta1)) > -qchisq(0.95, df = 1)/2]))
 
 cat(paste("Wald Confidence intervals:"
-      ,paste("\nbeta_0 = ", round(beta_hat$par[1], 4), " [95% CI: ", Wald.CI[1,1],", ", Wald.CI[1,2],"]")
-      ,paste("\nbeta_1 = ", round(beta_hat$par[2], 4), " [95% CI: ", Wald.CI[2,1],", ", Wald.CI[2,2],"]")
+      ,paste("\nbeta_0 = ", round(beta_hat$par[1], 4), " [95% CI: ", Wald.CI_former[1,1],", ", Wald.CI_former[1,2],"]")
+      ,paste("\nbeta_1 = ", round(beta_hat$par[2], 4), " [95% CI: ", Wald.CI_former[2,1],", ", Wald.CI_former[2,2],"]")
       ,"\n\nLikelihood-based Confidence intervals:"
       ,paste0("\nbeta_0 = ", round(beta_hat$par[1], 4), " [95% CI: ", CI.0[1],", ", CI.0[2],"]")
       ,paste0("\nbeta_1 = ", round(beta_hat$par[2], 4), " [95% CI: ", CI.1[1],", ", CI.1[2],"]")))

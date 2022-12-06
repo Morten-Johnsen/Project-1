@@ -71,7 +71,7 @@ res <- ggplot(data = D)+
   geom_point(aes(x = ws30, y = residuals))+ #ACTUAL PLOT
   labs(x = "Wind speed [m/s]", y = "Residuals [1/5000 kW]")+ #AXIS LABELS
   geom_line(aes(x = ws30, y = 0), size = 1, colour = "red")+ #LINE GOING THROUGH ZERO
-  ggtitle("Residuals (Tester/direct with ws.and.ws.squared$residuals)")+ #TITLE
+  ggtitle("Residuals (direct with ws.and.ws.squared$residuals)")+ #TITLE
   theme_bw()
 res2 <- ggplot(data = D)+
   theme_bw()+ #THEME
@@ -93,7 +93,6 @@ e2 <- D$residuals[-1] #for e_2 - e_n
 e <- matrix(c(e1,e2), ncol=2, byrow=F)
 
 #1.1
-##acf plot of model residuals in the x domain
 par(mfrow = c(1,1))
 e_vec <- D$residuals
 
@@ -133,9 +132,10 @@ V <- solve(hessian(bn_nll, opt_bivariate_normal$par, e = e))
 #### 2.1 - MLEs and confidence intervals ####
 #phi confidence interval
 #phi MLE
-abline(v = phi.hat, lty = 2, col = 4)
+#abline(v = phi.hat, lty = 2, col = 4)
 
 ## wald based
+phi.hat
 sd.phi <- se[2]
 
 (phi.lower.wald <- phi.hat - sd.phi*qnorm(0.975))
@@ -460,6 +460,9 @@ linear_model <- nlminb(c(1,0,0), linear_model_nll)
 #comparing likelihoods through LRT:
 chi.squared <- - 2 * (combined_model$objective - linear_model$objective)
 p.value.LRT <- 1 - pchisq(chi.squared, df = 1)
+
+(AIC_combined <- 2*combined_model$objective + 2*5)
+(AIC_linear <- 2*linear_model$objective + 2*3)
 
 #discussion:
 #(se bagerste side i bogen med egne noter)

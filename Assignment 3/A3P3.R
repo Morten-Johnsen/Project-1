@@ -176,7 +176,7 @@ ggplot(D)+
 #with delta = 0.91, 0.09 for red, orange
 ##################################################
 m <- 3 #3 components
-mu <- c(1/2,1,3/2)*mean(D$SLV) #init vals for the optim
+mu <- c(-1/2,1,3/2)*mean(D$SLV) #init vals for the optim
 sigma <- c(1/2,1,3/2)*sd(D$SLV) #init vals for the optim
 delta <- c(0.34,0.33) #fifty-fifty for the two dists
 wpars <- N.mix.pn2pw(n.dist=m, mu=mu, sigma=sigma, delta=delta)
@@ -281,7 +281,7 @@ melt(data.frame("Mu1" = Mu[Code!=1,1], "Mu2" = Mu[Code!=1,2])) %>%
   geom_histogram(aes(x = value), colour = "white")+
   facet_wrap(~variable, scales =  "free")
 
-#load("./3MixtureModelParametricBootstrap2000.Rdata")
+# load("./3MixtureModelParametricBootstrap2000.Rdata")
 # melt(data.frame("Mu1" = Mu[Code!=1,1], "Mu2" = Mu[Code!=1,2], "Mu3" = Mu[Code!=1,3])) %>%
 #   union(melt(data.frame("Sigma1" = Sigma[Code!=1,1], "Sigma2" = Sigma[Code!=1,2], "Sigma3" = Sigma[Code!=1,3]))) %>%
 #   union(melt(data.frame("Delta1" = Delta[Code!=1,1], "Delta2" = Delta[Code!=1,2], "Delta3" = Delta[Code!=1,3]))) %>%
@@ -363,7 +363,10 @@ N.llp <- sapply(X = eta1.w, FUN=N.pl, n.dist=m, y=D$SLV)
 N.llp2 <- sapply(X = eta2.w, FUN=N.pl, n.dist=m, y=D$SLV, first=F)
 
 plot(eta1.w,exp(N.llp-(max(N.llp))),type="l",
-     main = "Profile likelihood of FIRST variance param of 2 component norm mixture dist") #smart Jan-plot
+     ylab = "Normalized likelihood",
+     xlab = "eta_1",
+     main = "First variance param of 2NMM") #smart Jan-plot
+grid()
 lines(range(eta1.w),
       exp(-c(1,1) * qchisq(0.95,df=1)/2),
       col=2,lty=2)
@@ -591,8 +594,10 @@ par(mfrow = c(1,1))
 interval <- seq(min(D$SLV), max(D$SLV), length.out = length(D$SLV))
 ggplot(D)+
   geom_histogram(aes(x = SLV, y=..density..), colour = "white")+
-  geom_line(aes(x = interval, y = final.Dist(interval)))
-plot(interval, final.Dist(interval), "l")
+  geom_line(aes(x = interval, y = final.Dist(interval)))+
+  theme_bw()+
+  ggtitle("(2) HMM")
+#plot(interval, final.Dist(interval), "l")
 
 givenState1 <- function(x){
   return(mle2.HMM$gamma[1,1]*N.pdf(x, mle2.HMM$mu[1], mle2.HMM$sigma[1]) +
@@ -606,14 +611,15 @@ givenState2 <- function(x){
 
 ggplot(D)+
   geom_histogram(aes(x = SLV, y=..density..), colour = "white")+
-  geom_line(aes(x = interval, y = givenState1(interval), colour = "One-step ahead Given state 1"))+
-  geom_line(aes(x = interval, y = givenState2(interval), colour = "One-step ahead Given state 2"))+
+  geom_line(aes(x = interval, y = givenState1(interval), colour = "One-step ahead Given state 1"),size = 1)+
+  geom_line(aes(x = interval, y = givenState2(interval), colour = "One-step ahead Given state 2"),size = 1)+
   #geom_line(aes(x = interval, y = givenState2(interval)*mle2.HMM$delta[2] + givenState1(interval)*mle2.HMM$delta[1], colour = "Testt stonks"), size = 2)+
-  geom_line(aes(x = interval, y = final.Dist(interval), colour = "Long term returns"))+
-  scale_colour_manual(values = c("darkgreen", "red", "orange", "purple"))+
+  geom_line(aes(x = interval, y = final.Dist(interval), colour = "Long term returns"), size = 1)+
+  scale_colour_manual(values = c("blue", "red", "orange", "darkgreen"))+
   labs(colour = "", x = "SLV")+
   ggtitle("Long term and 1-step ahead return distributions")+
-  theme_bw()
+  theme_bw()+
+  theme(legend.position = "top")
 
 ####################################################################################################
 ###Subtask e of f
@@ -638,9 +644,9 @@ ggplot(data = D)+
 #PARAMETRIC BOOTSTRAP
 mu <- c(0,0) * mean(D$SLV) #arbitrary
 sigma <- c(1,1) * sd(D$SLV) #arbitrary
-gamma <- matrix(c(0.5,0.5,0.5,0.5), ncol=2,byrow=T) #arbitrary
+gamma <- matrix(c(0.95,0.05,0.05,0.95), ncol=2,byrow=T) #arbitrary
 
-k <- 2000
+k <- 1000
 GAMMA <- matrix(ncol=m*m,nrow=k)
 Mu <- matrix(ncol=m,nrow=k)
 Sigma <- matrix(ncol=m,nrow=k)
@@ -663,28 +669,31 @@ for(i in 1:k){
   print(c(i,Code[i]))
 }
 sum(Code!=1)
-save(Mu, Sigma, Delta, Code, GAMMA, file = "./HMMBOot2States.Rdata")
+#save(Mu, Sigma, Delta, Code, GAMMA, file = "./HMMBOot2States.Rdata")
+load("./HMMBOot2States.Rdata")
 
-melt(data.frame("Mu1" = Mu[Code!=1,1], "Mu2" = Mu[Code!=1,2])) %>%
-  union(melt(data.frame("Sigma1" = Sigma[Code!=1,1], "Sigma2" = Sigma[Code!=1,2]))) %>%
-  union(melt(data.frame("Delta1" = Delta[Code!=1,1], "Delta2" = Delta[Code!=1,2]))) %>%
-  union(melt(data.frame("Gamma11" = GAMMA[Code!=1,1], "Gamma22" = GAMMA[Code!=1,4]))) %>%
+melt(data.frame("Mu1" = Mu[Code!=1,1], "Mu2" = Mu[Code!=1,2],
+                "Sigma1" = Sigma[Code!=1,1], "Sigma2" = Sigma[Code!=1,2],
+                "Delta1" = Delta[Code!=1,1], "Delta2" = Delta[Code!=1,2],
+                "Gamma11" = GAMMA[Code!=1,1], "Gamma12" = GAMMA[Code!=1,2],
+                "Gamma21" = GAMMA[Code!=1,3], "Gamma22" = GAMMA[Code!=1,4])) %>%
   ggplot()+
   geom_histogram(aes(x = value), colour = "white")+
-  facet_wrap(~variable, scales =  "free")
+  facet_wrap(~variable, scales =  "free")+
+  theme_bw()
 
 
 ParametricBootCI <- data.frame(round(cbind(c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta, c(mle2.HMM$gamma[1,],mle2.HMM$gamma[2,])),
-                                           rbind(quantile(Mu[ ,1],prob=c(0.025,0.975)),
-                                                 quantile(Mu[ ,2],prob=c(0.025,0.975)),
-                                                 quantile(Sigma[ ,1],prob=c(0.025,0.975)),
-                                                 quantile(Sigma[ ,2],prob=c(0.025,0.975)),
-                                                 quantile(Delta[ ,1],prob=c(0.025,0.975)),
-                                                 quantile(Delta[ ,2],prob=c(0.025,0.975)),
-                                                 quantile(GAMMA[ ,1],prob=c(0.025,0.975)),
-                                                 quantile(GAMMA[ ,2],prob=c(0.025,0.975)),
-                                                 quantile(GAMMA[ ,3],prob=c(0.025,0.975)),
-                                                 quantile(GAMMA[ ,4],prob=c(0.025,0.975)))),
+                                           rbind(quantile(Mu[Code!=1 ,1],prob=c(0.025,0.975)),
+                                                 quantile(Mu[Code!=1 ,2],prob=c(0.025,0.975)),
+                                                 quantile(Sigma[Code!=1 ,1],prob=c(0.025,0.975)),
+                                                 quantile(Sigma[Code!=1 ,2],prob=c(0.025,0.975)),
+                                                 quantile(Delta[Code!=1 ,1],prob=c(0.025,0.975)),
+                                                 quantile(Delta[Code!=1 ,2],prob=c(0.025,0.975)),
+                                                 quantile(GAMMA[Code!=1 ,1],prob=c(0.025,0.975)),
+                                                 quantile(GAMMA[Code!=1 ,2],prob=c(0.025,0.975)),
+                                                 quantile(GAMMA[Code!=1 ,3],prob=c(0.025,0.975)),
+                                                 quantile(GAMMA[Code!=1 ,4],prob=c(0.025,0.975)))),
                                      digits = 5)); colnames(ParametricBootCI) <- c("MLE", "2.5%", "97.5%"); rownames(ParametricBootCI) <- c("Mu1", "Mu2",
                                                                                                                                             "Sigma1", "Sigma2",
                                                                                                                                             "Delta1", "Delta2",
@@ -692,23 +701,38 @@ ParametricBootCI <- data.frame(round(cbind(c(mle2.HMM$mu, mle2.HMM$sigma, mle2.H
                                                                                                                                             "GAMMA21", "GAMMA22")
 ParametricBootCI[,c(2,1,3)]
 
-# M <- diag(m^2+m) #We expect all zeros apart from the diagonal.
-# diagonal <- c(1,1,exp(wpars2.HMM.opt[3]),exp(wpars2.HMM.opt[4]),exp(wpars2.HMM.opt[5]),wpars2.HMM.opt[6])
-# M <- diagonal * M
-# #M <- mu1/theta1,  mu2/theta1, sigma1/theta1, sigma2/theta1, gamma1/theta1, gamma2/theta1
-#   #   mu1/theta2,  mu2/theta2, sigma1/theta2, sigma2/theta2, gamma1/theta2, gamma2/theta2
-#   #   mu1/eta1,    mu2/eta1,   sigma1/eta1,   sigma2/eta1,   gamma1/eta1,   gamma2/eta1
-#   #   mu1/eta2,    mu2/eta2,   sigma1/eta2,   sigma2/eta2,   gamma1/eta2,   gamma2/eta2
-#   #   mu1/tgamma1, mu2/tgamma, sigma1/tgamme, sigma2/tgamme, gamma1/tgamma, gamma2/tgamma
-# 
-# invG <- t(M) %*% solve(H.w2.opt.HMM) %*% M #p. 54 in HMM
-# sd.n2.opt.HMM <- sqrt(diag(invG))
-# CI.n2.HMM <- replicate(3, c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta)) + qnorm(0.975)*replicate(3, sd.n2.opt.HMM)*cbind(0,rep(-1,length(c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta))), 1)
-# CI.n2.HMM <- data.frame(CI.n2.HMM, row.names=c("mu1","mu2","sigma1","sigma2","gamma1","gamma2")) #"gamma/delta" er diag eller off-diag
-# colnames(CI.n2.HMM) <- c("mle","lower","upper")
-# CI.n2.HMM #OBS! på DELTA!, compare to:
-# #CI.w2.HMM
-# mle2.HMM$delta
-# mle2.HMM$gamma
-# #mle for gamma1 og gamma2 skal forstås som hhv. sandsynlighederne for at være i state 1 og blive dér og være i state 2 og blive dér.
+#HMM f - Short term predictions
+y <- D$SLV
+x_first <- 1
+x <- c()
+x[1] <- x_first
+x_test <- sample(x = c(1,2), size = length(D$SLV), replace <- TRUE, prob = mle2.HMM$delta)
 
+L.HMM <- function(theta){
+  for (i in 2:length(x)){
+    P_Xi_given_Ximinus1 <- mle2.HMM$gamma[x[i-1],x[i]]
+    P_Yi_given_Xi <- dnorm(y[i], mean = mle2.HMM$mu[x[i]], sd = mle2.HMM$sigma[x[i]])
+    L <- L + log(P_Xi_given_Ximinus1) + log(P_Yi_given_Xi)
+  }
+  return(L)
+}
+
+
+expand.grid(rep(1,length(D$SLV)), rep(2,length(D$SLV)))[,1]
+
+theta <- sample(c(4,0.6), size = length(D$SLV), replace = T)
+
+x <- nlminb(theta, L.HMM, lower = 0)
+
+L.HMM(x_test)
+
+x <- c()
+x[1] <- 1
+for (i in 2:length(D$SLV)){
+  ll_x_given_x_minus1 <- log(mle2.HMM$gamma[x[i-1],])
+  ll_y_given_x <- log(dnorm(D$SLV[i], mean = mle2.HMM$mu, sd = mle2.HMM$sigma))
+  ll_x_given_y <- ll_y_given_x + ll_x_given_x_minus1
+  cat(ll_x_given_y, "SLV=",round(D$SLV[i],4),", y given x =", round(ll_y_given_x,4),"\n")
+  x[i] <- order(ll_x_given_y)[2]
+}
+x

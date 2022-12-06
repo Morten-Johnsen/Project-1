@@ -184,7 +184,7 @@ Calculating the wald test statistic (*p. 156*, or *p. 42 with* $\theta_0 = 0$).
 
 ```{r}
 waldTestStatistic <- beta1/sd.beta1
-wald.p.value <- 2*pnorm(waldTestStatistic) #Skal det her være dnorm i stedet måske?
+wald.p.value <- 2*pnorm(waldTestStatistic)
 
 cat("The wald test statistic = ",waldTestStatistic,
     "\np-value = ", wald.p.value,
@@ -338,7 +338,7 @@ nll.exp <- function(theta
   beta2 <- theta[3]
   
   h <- exp(- beta0 - beta1 * treatment - beta2 * cd4)
-  H <- time/exp(beta0 + beta1 * treatment + beta2 * cd4)
+  H <- time/exp(beta0 + beta1 * treatment + beta2 * cd4)# time * h
   nll <- -sum(event*log(h) - H)
   return(nll)
 }
@@ -351,7 +351,7 @@ exp.model.manual.AIC <- - 2 * exp.model.manual$objective - 2 * 3
 
 ##### Weibull model
 
-Use: slide 10 for f(t), S(t), h(t) and H(t) relationships, slide 19 for general log-likelihood expression for censored data, slide 55 for S(t) and *z*, slide 60 for h(t).
+Use: slide 10 for f(t), S(t), h(t) and H(t) relationships, slide 19 for general log-likelihood expression for censored data, slide 55 for S(t) and *z*, slide 43 for weibull, 60 for h(t) for loglog.
 
 ```{r}
 #summary(weibull.model)
@@ -539,7 +539,7 @@ tibble("parameter" = c("beta_0", "beta_1", "beta_2", "sigma")
        , "Wald upper CI (97.5%)" = c(weibull.wald.upper[2:4], exp(weibull.wald.upper[1])))
 ```
 
-$\theta$ does not span 1, and thus the estimated weibull distribution is significantly different from simply using an exponential distribution.
+$\sigma$ does not span 1, and thus the estimated weibull distribution is significantly different from simply using an exponential distribution.
 
 Double-check whether the regularity assumption which is necessary for the use of Wald confidence intervals is appropriate, by examining the linearity of the score function at the MLE estimates:
 
@@ -754,7 +754,7 @@ For increasing the cd4 count by 50:
 ```{r}
 beta2 <- weibull.model.manual$par[4]
 
-cat("Time Ratio for the treatment effect: TR(tx = 1, tx = 0) = ", exp(beta2*50), " 95% CI [",exp(c(50*beta2.lower)),",", exp(c(50*beta2.upper)),"]")
+cat("Time Ratio for the cd4 * 50 effect: TR(tx = 1, tx = 0) = ", exp(beta2*50), " 95% CI [",exp(c(50*beta2.lower)),",", exp(c(50*beta2.upper)),"]")
 ```
 
 Here we see that by increasing the cd4 count by 50, the median survival time is increased by a factor 2.8 95% CI [2.26, 3.60].
