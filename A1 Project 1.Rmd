@@ -231,6 +231,8 @@ lambda_NLL <- function(lambda, pow.obs.norm = D$pow.obs.norm){
   return(NLL)
 }
 
+theta.hat <- nlminb(start=0.5, objective = lambda_NLL) #hov, den var gone før
+
 #round to two decimal points.
 lambda <- round(theta.hat$par, 2)
 D$transformed.pow.obs.norm <- Trans.eq1(lambda, D$pow.obs.norm)
@@ -244,7 +246,9 @@ qqline(y)
 hist(y, main = "Transformed Pow.obs with lambda = 0.26")
 ```
 **Change of variable**
-
+$$
+y = g(x) = \dfrac{1}{\lambda} log\left(\dfrac{x^{\lambda}}{1-x^{\lambda}} \right)
+$$
 In order to calculate the new likelihood function for the transformed pow.obs, we use change of variable with $\lambda = 0.26$:
 $$
 y = g(x) = \dfrac{1}{0.26} log\left(\dfrac{x^{0.26}}{1-x^{0.26}} \right)
@@ -835,30 +839,31 @@ wald.wd30.rho.hessian.matrix.based <- wrapped.cauc.par$par[2] + c(-1,1) * qnorm(
 ```
 
 ```{r}
-cat("MLE: (shape; scale) = (",round(mle.wd30[1],3),"; ",round(mle.wd30[2],3),")\n\n\n")
+cat("MLE: (mu; rho) = (",round(mle.wd30[1],3),"; ",round(mle.wd30[2],3),")\n\n\n")
 
 round( t(data.frame( pf.CI.wd30.mu
-                   , wald.wd30.mu
+                   #, wald.wd30.mu
                    , wald.wd30.mu.hessian.matrix.based
                    , pf.CI.wd30.rho
-                   , wald.wd30.rho
+                   #, wald.wd30.rho
                    , wald.wd30.rho.hessian.matrix.based, row.names = c("LOWER [95%]", "UPPER [95%]"))), digits = 3 )
 ```
 
 
 The most appropriate distributions and their parameter estimates (plots) and associated uncertainties (values)
 ```{r, fig.width=16, fig.height=6, warning = F}
+textSize=8
 par(mfrow=c(1,4))
 
-temp1 <- paste("alpha == ", round(theta.hat.y$par[1], 4)) #
-temp2 <- paste("beta == ", round(theta.hat.y$par[2], 3)) #
+temp1 <- paste("mu == ", round(theta.hat.y$par[1], 1),"(",round(wald.pow.mu.m,1)[1],",",round(wald.pow.mu.m,1)[2],")") #
+temp2 <- paste("sigma^2 == ", round(theta.hat.y$par[2]^2, 1),"(",round(wald.pow.sd.m[1]^2,1),",",round(wald.pow.sd.m[2]^2,1),")") #
 temp <- c(temp1, temp2)
 
 ppN <- ggplot(D)+
   geom_histogram(aes(x = transformed.pow.obs.norm, y = ..density..), colour='white', alpha=0.6, bins=30, fill = "red")+
   theme_bw()+
   stat_function(aes(colour = "Normal Distribution"), fun = dnorm, n = dim(D)[1], args = list(mean = theta.hat.y$par[1], sd = theta.hat.y$par[2]))+
-  annotate( "text", x = 4/5*max(D$transformed.pow.obs.norm), y = c(0.11, 0.1), label = temp, parse = T  ) +
+  annotate( "text", x = 3.25/5*max(D$transformed.pow.obs.norm), y = c(0.11, 0.1), label = temp, parse = T, size=textSize  ) +
   scale_colour_manual(values = "black")+
   ggtitle("Power Production (Normal Transformed)")+
   labs(x = "Power Production [Transformed domain]")+
@@ -866,8 +871,8 @@ ppN <- ggplot(D)+
         ,legend.background = element_rect(fill = "white", color = "black"))+
   labs(colour = "")
 
-temp1 <- paste("alpha == ", round(mle.pow[1], 4)) #par.beta$par[1]
-temp2 <- paste("beta == ", round(mle.pow[2], 3)) #par.beta$par[2]
+temp1 <- paste("alpha == ", round(mle.pow[1], 2),"(",round(wald.pow.shape1.hessian.matrix.based,2)[1],",",round(wald.pow.shape1.hessian.matrix.based,2)[2],")") #par.beta$par[1]
+temp2 <- paste("beta == ", round(mle.pow[2], 2),"(",round(wald.pow.shape2.hessian.matrix.based,2)[1],",",round(wald.pow.shape2.hessian.matrix.based,2)[2],")") #par.beta$par[2]
 temp <- c(temp1, temp2)
 
 ppB <- ggplot(D)+
@@ -875,7 +880,7 @@ ppB <- ggplot(D)+
   theme_bw()+
   stat_function(aes(colour = "Beta Distribution"), fun = dbeta, n = dim(D)[1], args = list(shape1 = mle.pow[1], shape2 = mle.pow[2]))+
   ylim(c(0,5))+
-  annotate( "text", x = 4/5*max(D$pow.obs.norm), y = c(4.5, 4.1), label = temp, parse = T  ) +
+  annotate( "text", x = 4/5*max(D$pow.obs.norm), y = c(4.5, 4.1), label = temp, parse = T, size=textSize  ) +
   scale_colour_manual(values = "black")+
   ggtitle("Power Production (Normalized)")+
   labs(x = "1/5000 Power production [kW]")+
@@ -883,17 +888,17 @@ ppB <- ggplot(D)+
         ,legend.background = element_rect(fill = "white", color = "black"))+
   labs(colour = "")
 
-temp1 <- paste("k == ", round(mle.ws30.weib[1],3),"(",round(wald.ws30.shape.hessian.matrix.based,3)[1],",",round(wald.ws30.shape.hessian.matrix.based,3)[2],")")
-temp2 <- paste("lambda == ", round(mle.ws30.weib[2],3), "  (",round(wald.ws30.scale.hessian.matrix.based,3)[1], ",",round(wald.ws30.scale.hessian.matrix.based,3)[2],")")
-temp3 <- paste("E[X] == ", round(par.repar.wei$par[1],3))
-temp4 <- paste("V[X] == ", round(par.repar.wei$par[2],3))
+temp1 <- paste("k == ", round(mle.ws30.weib[1],2),"(",round(wald.ws30.shape.hessian.matrix.based,2)[1],",",round(wald.ws30.shape.hessian.matrix.based,2)[2],")")
+temp2 <- paste("lambda == ", round(mle.ws30.weib[2],1), "(",round(wald.ws30.scale.hessian.matrix.based,1)[1], ",",round(wald.ws30.scale.hessian.matrix.based,2)[2],")")
+temp3 <- paste("E[X] == ", round(par.repar.wei$par[1],1),"(",round(wald.ws30.E.hessian.matrix.based,1)[1],",",round(wald.ws30.E.hessian.matrix.based,1)[2],")")
+temp4 <- paste("V[X] == ", round(par.repar.wei$par[2],1))
 temp <- c(temp1, temp2, temp3, temp4)
 
 ps <- ggplot(D)+
   geom_histogram(aes(x = ws30, y = ..count../sum(..count..)) , colour = "white", alpha=0.6, bins = 30, fill = "black")+
   theme_bw()+
   stat_function(aes(colour = "Weibull Distribution"), fun = dweibull, n = dim(D)[1], args = list(shape = par.ws30$par[1], scale = par.ws30$par[2])) +
-  annotate( "text", x = 4/5*max(D$ws30), y = c(0.09, 0.082, 0.074, 0.066), label = temp, parse = T  ) +
+  annotate( "text", x = 4/5*max(D$ws30), y = c(0.09, 0.082, 0.074, 0.066), label = temp, parse = T, size=textSize  ) +
   scale_colour_manual(values = "black")+
   ggtitle("Wind Speed")+
   labs(x = "Wind speed [m/s]")+
@@ -901,8 +906,8 @@ ps <- ggplot(D)+
         ,legend.background = element_rect(fill = "white", color = "black"))+
   labs(colour = "")
 
-temp1 <- paste("mu ==", round(mle.wd30[1], 3)) #wrapped.cauc.par$par[1]
-temp2 <- paste("rho ==", round(mle.wd30[2],4)) #wrapped.cauc.par$par[2]
+temp1 <- paste("mu ==", round(mle.wd30[1], 2),"(",round(wald.wd30.mu.hessian.matrix.based,2)[1],",",round(wald.wd30.mu.hessian.matrix.based,2)[2],")") #wrapped.cauc.par$par[1]
+temp2 <- paste("rho ==", round(mle.wd30[2],2),"(",round(wald.wd30.rho.hessian.matrix.based,2)[1],",",round(wald.wd30.rho.hessian.matrix.based,2)[2],")") #wrapped.cauc.par$par[2]
 temp <- c(temp1, temp2)
 
 pd <- ggplot(D)+
@@ -911,7 +916,7 @@ pd <- ggplot(D)+
   scale_x_continuous(breaks = c(0,pi/2,pi,3/2*pi,2*pi)
                      , labels =c("0", "pi/2", "pi", "3/2pi", "2pi"))+
   stat_function(aes(colour = "Wrapped Cauchy"), fun = dwrappedcauchy, n = dim(D)[1], args = list(mu = wrapped.cauc.par$par[1], rho = 0.36))+
-  annotate( "text", x = 1/5*max(D$wd30), y = c(0.35, 0.325), label = c(temp1,temp2), parse = T  ) +
+  annotate( "text", x = 1/5*max(D$wd30), y = c(0.35, 0.325), label = c(temp1,temp2), parse = T, size = textSize  ) +
   scale_colour_manual(values = "black")+
   ggtitle("Wind direction")+
   labs(x = "Wind direction [Radians]")+
@@ -929,12 +934,12 @@ First are given the 95% likelihood based and Wald CIs of the parameters of the d
 round( rbind( wald.pow.mu, wald.pow.mu.m, wald.pow.sd, wald.pow.sd.m, theta.hat.y$par ), digits = 3 )#for norm dist of transformed pow obs.
 #they replace the beta dist below: CI.pow1 to mle.pow
 
-round( rbind( CI.pow1, wald.pow.shape1, CI.pow2, wald.pow.shape2, mle.pow,
-              CI.ws30.shape, wald.ws30.shape, CI.ws30.scale, wald.ws30.scale, mle.ws30.weib, 
-              CI.wd30.mu, wald.wd30.mu, CI.wd30.rho, wald.wd30.rho, mle.wd30 ), digits = 3 )
+round( rbind( pf.based.CI.pow1, wald.pow.shape1, pf.based.CI.pow2, wald.pow.shape2, mle.pow,
+              pf.CI.ws30.shape, wald.ws30.shape, pf.CI.ws30.scale, wald.ws30.scale, mle.ws30.weib, 
+              pf.CI.wd30.mu, wald.wd30.mu, pf.CI.wd30.rho, wald.wd30.rho, mle.wd30 ), digits = 3 )
 
-round( rbind( wald.pow.shape1.m, wald.pow.shape2.m, wald.ws30.scale.m,
-              wald.ws30.shape.m, wald.wd30.mu.m, wald.wd30.rho.m ), digits = 3 ) #wald matrix
+round( rbind( wald.pow.shape1.hessian.matrix.based, wald.pow.shape2.hessian.matrix.based, wald.ws30.scale.hessian.matrix.based,
+              wald.ws30.shape.hessian.matrix.based, wald.wd30.mu.hessian.matrix.based, wald.wd30.rho.hessian.matrix.based ), digits = 3 ) #wald matrix
 
 
 round( rbind(CI.ws30.E, wald.ws30.E), digits=3);round( rbind(repar.E.ws30$par[2]), digits=3)
