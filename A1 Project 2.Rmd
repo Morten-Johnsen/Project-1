@@ -149,7 +149,7 @@ CI <- p.hat + c(-1,1)*qnorm(c(0.975))*sd/sqrt(sum(log.data$n)) #Så skal det her
 #jeg tænkte på, om ikke det var dette CI som kunne bruges til at teste vha. likelihood, om theta.hat overlapper med 0:
 H.L.theta <- hessian(func = L, x = theta.hat)
 V.L.theta <- solve(H.L.theta)
-CI.theta <- theta.hat + c(-1,1) * qnorm(0.975) * sqrt(V.L.theta)
+(CI.theta <- theta.hat + c(-1,1) * qnorm(0.975) * sqrt(V.L.theta))
 #KOMMENTAR:SLUT. Dette CI.theta kan vel bruges til at sige noget om, at da det ikke indeholder 0, så må effekten være signifikant?
 #Det virker rigtigt. Hvilket slide/hvilken side i bogen er brugt? Slide 22, uge 3. Her er pi_1 = x1/n1 og pi_2 = x2/n2.
 ```
@@ -201,6 +201,7 @@ $$
 #p_0: Probability of aids in control group
 #p_1: Probability of aids in treatment group
 
+#COMMENT 9. dec: disse to kan kun bruges til at estimere MLE men formodentligt ikke usikkerheden på MLE.
 #calculate likelihood
 nll.p_0 <- function(beta, x = log.data$AIDS_yes[2], n = log.data$n[2]){
   p <- exp(beta)/(1+exp(beta))
@@ -245,7 +246,23 @@ print(cat(paste0("with glm model: ", coef(fit.glm)
 Below can be seen the profile likelihood curves for the $\beta_0$ and $\beta_1$ estimates.
 
 ```{r}
-#Profile likelihoods
+###NEW NEW NEW NEW 9. dec
+#USED FOR WALD CI IN NEXT BLOCK
+nll.bin <- function(theta, event = log.data$AIDS_yes
+                    , n = log.data$n
+                    , treatment = c(1,0)){
+  beta_0 <- theta[1]
+  beta_1 <- theta[2]
+  theta <- exp(beta_0+beta_1*treatment)/(1+exp(beta_0+beta_1*treatment))
+  #nll <- -sum(dbinom(x, size = n, prob = p, log = T))
+  nll <- -sum(log(theta)*event + (n-event)*log((1 - theta)))
+  return(nll)
+}
+beta <- nlminb(start = c(0,0), objective = nll.bin)$par
+sd <- sqrt(diag(solve(hessian(x = beta, func = nll.bin))))
+###NEW NEW NEW NEW 9. dec
+
+#Profile likelihoods #comment 9. dec: PL ikke fikset endnu
 prof.b0 <- function(beta0, x = log.data$AIDS_yes[2], n = log.data$n[2]){
   p <- exp(beta0)/(1+exp(beta0))
   return(-sum(dbinom(x, size = n, prob = p, log = T)))
@@ -280,12 +297,12 @@ From these figures it can be concluded that the quadratic approximation of the C
 The Wald and likelihood-based confidence intervals for the two $\beta_i, i\in (0,1)$ parameters can be seen printed below.
 
 ```{r}
-sd_0 <- as.numeric(sqrt(diag(solve(hessian(beta_0, func = nll.p_0)))))
-sd_1 <- as.numeric(sqrt(diag(solve(hessian(beta_1, func = nll.p_1, beta_0 = beta_0)))))
+#sd_0 <- as.numeric(sqrt(diag(solve(hessian(beta_0, func = nll.p_0))))) #commented out 9. dec
+#sd_1 <- as.numeric(sqrt(diag(solve(hessian(beta_1, func = nll.p_1, beta_0 = beta_0))))) #commented out 9. dec
 
 #Wald 95% CIs and profile-likelihoods with approx 95% CI
-W.CI.0 <- round(beta_0 + c(-1,1)*qnorm(0.975)*sd_0,4)
-W.CI.1 <- round(beta_1 + c(-1,1)*qnorm(0.975)*sd_1,4) #KOMMENTAR: CI.theta fra den tidligere kommentar er lig dette interval. Dette er vel netop, fordi theta i den sammenhæng beskriver forskellen på, om der er treatment eller ej, hvilket er det præcis samme som beta_1.
+W.CI.0 <- round(beta[1] + c(-1,1)*qnorm(0.975)*sd[1],4)
+W.CI.1 <- round(beta[2] + c(-1,1)*qnorm(0.975)*sd[2],4) #KOMMENTAR: CI.theta fra den tidligere kommentar er lig dette interval. Dette er vel netop, fordi theta i den sammenhæng beskriver forskellen på, om der er treatment eller ej, hvilket er det præcis samme som beta_1.
 #W.CI.1;CI.theta
 #Måske, forstår stadig ikke helt theta.hat fra tidligere, så det er svært at sige. Men du har nok ret.
 
