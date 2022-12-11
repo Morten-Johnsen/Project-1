@@ -621,7 +621,7 @@ ws30.fun <- function(shape, scale, data){#####
   prod(dweibull(x = data, shape = shape, scale = scale, log = F)*2)#to not get full zeros
 }
 
-l.ws30.fun <- function(shape, scale, data){#####
+l.ws30.fun <- function(shape, scale, data){
   sum(dweibull(x = data, shape = shape, scale = scale, log = T))
 }
 nl.ws30.funp <- function(p, data){
@@ -698,15 +698,15 @@ k.func <- function(k,mu,var){
   return((var - var.est)^2)
 }
 
-nll.wei <- function(theta, x){
+nll.wei <- function(theta, data){
   mu <- theta[1]
   var <- theta[2]
   k <- nlminb(start = 1, objective = k.func, mu = mu, var = var)$par
-  nll <- -sum(dweibull(x, shape = k, scale = mu/gamma((k+1)/k), log = T))
+  nll <- -sum(dweibull(data, shape = k, scale = mu/gamma((k+1)/k), log = T))
   return(nll)
 }
 
-par.repar.wei <- nlminb(start = c(1,0.5), objective = nll.wei, x = D$ws30, lower = c(0,0))
+par.repar.wei <- nlminb(start = c(1,0.5), objective = nll.wei, data = D$ws30, lower = c(0,0))
 
 ################################################################################################### E[x]: CIs (lb and W), and PL
 nll.repar.ws30 <- function(p, data){
@@ -751,6 +751,12 @@ wald.ws30.E <- repar.E.ws30$par[2] + c(-1,1) * qnorm(1-alpha/2) * sqrt(V.ws30.E)
 H.ws30.E.hessian.matrix.based <- hessian(func = repar.l.ws30.funp, x = repar.E.ws30$par, data = D$ws30)
 sd.ws30.E.hessian.matrix.based <- sqrt(diag(solve(H.ws30.E.hessian.matrix.based)))
 wald.ws30.E.hessian.matrix.based <- repar.E.ws30$par[2] + c(-1,1) * qnorm(1-alpha/2) * sd.ws30.E.hessian.matrix.based[2]
+
+#For the variance:
+H.ws30.V.hessian.matrix.based <- hessian(func = nll.wei, x = par.repar.wei$par, data = D$ws30)
+sd.ws30.V.hessian.matrix.based <- sqrt(diag(solve(H.ws30.V.hessian.matrix.based)))
+wald.ws30.E2.hessian.matrix.based <- par.repar.wei$par[1] + c(-1,1) * qnorm(1-alpha/2) * sd.ws30.V.hessian.matrix.based[1]
+wald.ws30.V.hessian.matrix.based <- par.repar.wei$par[2] + c(-1,1) * qnorm(1-alpha/2) * sd.ws30.V.hessian.matrix.based[2]
 ```
 
 Expected value of the distribution and its uncertainty compared to the estimates achieved through reparametrization:
@@ -891,7 +897,7 @@ ppB <- ggplot(D)+
 temp1 <- paste("k == ", round(mle.ws30.weib[1],2),"(",round(wald.ws30.shape.hessian.matrix.based,2)[1],",",round(wald.ws30.shape.hessian.matrix.based,2)[2],")")
 temp2 <- paste("lambda == ", round(mle.ws30.weib[2],1), "(",round(wald.ws30.scale.hessian.matrix.based,1)[1], ",",round(wald.ws30.scale.hessian.matrix.based,2)[2],")")
 temp3 <- paste("E[X] == ", round(par.repar.wei$par[1],1),"(",round(wald.ws30.E.hessian.matrix.based,1)[1],",",round(wald.ws30.E.hessian.matrix.based,1)[2],")")
-temp4 <- paste("V[X] == ", round(par.repar.wei$par[2],1))
+temp4 <- paste("V[X] == ", round(par.repar.wei$par[2],1),"(",round(wald.ws30.V.hessian.matrix.based,1)[1],",",round(wald.ws30.V.hessian.matrix.based,1)[2],")")
 temp <- c(temp1, temp2, temp3, temp4)
 
 ps <- ggplot(D)+
@@ -942,8 +948,8 @@ round( rbind( wald.pow.shape1.hessian.matrix.based, wald.pow.shape2.hessian.matr
               wald.ws30.shape.hessian.matrix.based, wald.wd30.mu.hessian.matrix.based, wald.wd30.rho.hessian.matrix.based ), digits = 3 ) #wald matrix
 
 
-round( rbind(CI.ws30.E, wald.ws30.E), digits=3);round( rbind(repar.E.ws30$par[2]), digits=3)
-wald.ws30.E.m #wald matrix
+round( rbind(pf.CI.ws30.E, wald.ws30.E.hessian.matrix.based), digits=3);round( rbind(repar.E.ws30$par[2]), digits=3)
+#wald.ws30.E.m #wald matrix
 ```
 
 ##### Expected values and uncertainty
