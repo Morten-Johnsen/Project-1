@@ -346,7 +346,7 @@ nll.exp <- function(theta
 
 exp.model.manual <- nlminb(start = c(1,1,1), objective = nll.exp)
 sd.exp.manual <- sqrt(diag(solve(hessian(func = nll.exp, x = exp.model.manual$par))))
-exp.model.manual.AIC <- - 2 * exp.model.manual$objective - 2 * 3
+exp.model.manual.AIC <-  2 * exp.model.manual$objective + 2 * 3
 
 ```
 
@@ -409,7 +409,7 @@ loglogistic.model.manual.AIC <- 2 * loglogistic.model.manual$objective + 2 * len
 
 Examining the fits of the models through the cox-snell residuals
 
-```{r}
+```{r, fig.width=16, fig.height=5}
 par(mfrow = c(1,3))
 actg$cox.snell.exp <- actg$time * exp(- exp.model$linear.predictors)
 fit.exp <- survfit(Surv(cox.snell.exp, event == 1) ~ 1, data = actg)
@@ -561,49 +561,27 @@ score.nll.wei <- function(theta){
   return(score)
 }
 
-# Ved ikke om det er mere passende at finde score functions ud fra de enkelte parametre? Dette har dog ingen
-#effekt på den derpåfølgende konklusion.
-# score.beta0 <- function(theta){
-#   time = actg$time
-#   event = actg$event
-#   treatment = actg$tx
-#   cd4 = actg$cd4
-#   sigma <- exp(theta[1])  #estimated the scale parameter on log-scale
-#   beta0 <- theta[2]
-#   beta1 <- theta[3]
-#   beta2 <- theta[4]
-# 
-#   out <- -sum(-event/sigma + time^(1/sigma)*exp(-(beta0+beta1*treatment+beta2*cd4)/sigma)/sigma)
-#   return(out)
-# }
-#
-# score.beta1 <- function(theta){
-#   time = actg$time
-#   event = actg$event
-#   treatment = actg$tx
-#   cd4 = actg$cd4
-#   sigma <- exp(theta[1])  #estimated the scale parameter on log-scale
-#   beta0 <- theta[2]
-#   beta1 <- theta[3]
-#   beta2 <- theta[4]
-# 
-#   out <- -sum(-event*treatment/sigma + time^(1/sigma)*treatment*exp(-(beta0+beta1*treatment+beta2*cd4)/sigma)/sigma)
-#   return(out)
-# }
-# 
-# score.beta2 <- function(theta){
-#   time = actg$time
-#   event = actg$event
-#   treatment = actg$tx
-#   cd4 = actg$cd4
-#   sigma <- exp(theta[1])  #estimated the scale parameter on log-scale
-#   beta0 <- theta[2]
-#   beta1 <- theta[3]
-#   beta2 <- theta[4]
-# 
-#   out <- -sum(-event*cd4/sigma + time^(1/sigma)*cd4*exp(-(beta0+beta1*treatment+beta2*cd4)/sigma)/sigma)
-#   return(out)
-# }
+solve(hessian(func = nll.wei, x = weibull.model.manual$par)) 
+#var(theta) show parameter covariances of the same scale as the parameters themselves. Thus the other parameters should be optimized, when calculating PL for a given parameter. However, the below code yield the same parameter sds and confint, indicating that regularity assumption is appropriate.
+test <- survreg(Surv(time, event) ~ tx + cd4, data = actg)
+confint(test)
+
+score.nll.wei. <- function(theta){
+  time = actg$time
+  event = actg$event
+  treatment = actg$tx
+  cd4 = actg$cd4
+  sigma <- exp(theta[1])  #estimated the scale parameter on log-scale
+  beta0 <- theta[2]
+  beta1 <- theta[3]
+  beta2 <- theta[4]
+
+  theta <- (beta0 + beta1 * treatment + beta2 * cd4)
+
+  score <- -sum(-event/sigma + time^(1/sigma)*exp(-theta/sigma)/sigma)
+  return(score)
+}
+
 
 beta0 <- weibull.model.manual$par[2]
 beta1 <- weibull.model.manual$par[3]
@@ -736,6 +714,23 @@ beta1.upper <- pfCI_beta1[2]
 beta2.lower <- pfCI_beta2[1]
 beta2.upper <- pfCI_beta2[2]
 ```
+```{r}
+#Går tilbage til Wald
+cat("beta_0 = ", weibull.model.manual$par[2], "95% CI [",weibull.wald.lower[2],", ",weibull.wald.upper[2],"]"
+    ,"\nbeta_1 = ", weibull.model.manual$par[3], "95% CI [",weibull.wald.lower[3],", ",weibull.wald.upper[3],"]"
+    ,"\nbeta_2 = ", weibull.model.manual$par[4], "95% CI [",weibull.wald.lower[4],", ",weibull.wald.upper[4],"]"
+    ,"\nscale = ", exp(weibull.model.manual$par[1]), "95% CI [",exp(weibull.wald.lower[1]),", ",exp(weibull.wald.upper[1]),"]\n")
+
+beta0.lower <- weibull.wald.lower[2]
+beta0.upper <- weibull.wald.upper[2]
+
+beta1.lower <- weibull.wald.lower[3]
+beta1.upper <- weibull.wald.upper[3]
+
+beta2.lower <- weibull.wald.lower[4]
+beta2.upper <- weibull.wald.upper[4]
+```
+
 
 
 #### Using your model compute the time ratio for the treatment effect. Similarly, compute the time ratio for the effect of increasing the CD4 count with 50. In both cases unceartainty evaluation (e.g. confidence intervals) should be included. Interpret the results in words
@@ -748,7 +743,7 @@ beta1 <- weibull.model.manual$par[3]
 cat("Time Ratio for the treatment effect: TR(tx = 1, tx = 0) = ", exp(beta1), " 95% CI [",exp(c(beta1.lower)),",", exp(c(beta1.upper)),"]")
 ```
 
-Based on this calculation of the time ratio of the treatment effect, it is evident that the treatment increase the median survival time by a factor 2.32 95% CI [1.53; 3.68].
+Based on this calculation of the time ratio of the treatment effect, it is evident that the treatment increase the median survival time by a factor 2.32 95% CI [1.32; 4.06].
 
 For increasing the cd4 count by 50:
 
@@ -758,7 +753,7 @@ beta2 <- weibull.model.manual$par[4]
 cat("Time Ratio for the cd4 * 50 effect: TR(tx = 1, tx = 0) = ", exp(beta2*50), " 95% CI [",exp(c(50*beta2.lower)),",", exp(c(50*beta2.upper)),"]")
 ```
 
-Here we see that by increasing the cd4 count by 50, the median survival time is increased by a factor 2.8 95% CI [2.26, 3.60].
+Here we see that by increasing the cd4 count by 50, the median survival time is increased by a factor 2.8 95% CI [1.93, 4.07].
 
 #### Assess the goodness of fit of this model using a plot based on the Cox Snell residuals
 
