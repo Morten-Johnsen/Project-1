@@ -114,13 +114,14 @@ D$ws.ws2.wd.pred <- ws.ws2.and.wd$coefficients[1] + ws.ws2.and.wd$coefficients[2
 #summary(transfitS)
 
 ggplot(data = D)+
-  geom_point(aes(x=ws30, y=transformed.pow.obs.norm, colour="Data"), size = 4, alpha = 0.6)+
+  geom_point(aes(x=ws30, y=transformed.pow.obs.norm, colour="Data"), size = 2, alpha = 0.8)+
   geom_line(aes(x=ws30, y=ws.pred, colour="ws only"))+
   geom_line(aes(x=ws30, y=ws.ws2.pred, colour="ws + ws^2"))+
-  scale_colour_manual(values = c("red", "blue", "orange"))+
+  scale_colour_manual(values = c("black", "blue", "red"))+
   #geom_line(aes(x=ws30, y=ws.ws2.wd.pred, colour="ws + ws^2 + cos(wd)"))+
   labs(x = "Wind speeds", y="Transformed, norm power obs", colour = "")+
   theme_bw()+
+  theme(legend.position = "top", legend.background = element_rect(colour = "black"))+
   ggtitle("Fitted models in Transformed Domain")
 
 summary(lm( (D$transformed.pow.obs.norm ~ ws30 + I(ws30^2) + wd30), data = D)) #simply a check with the final model to make sure that wd still is irrelevant as regressor
@@ -166,7 +167,7 @@ betas <- solve( (t(X)%*%X) ) %*% t(X) %*% Y
 
 NLL.norm.lin <- function(p, regr1, regr2, response){
   mu <- p[1] + p[2]*regr1 + p[3]*regr2
-  sigma <- sqrt( 1/length(response) * sum( (response - mu)^2  ) )
+  sigma <- sqrt( 1/length(response) * sum( (response - mu)^2  ) ) #this is 9.22
   return( -sum( dnorm( x = response, mean = mu, sd = sigma, log = T ) )  )
 }
 norm.lin.par <- nlminb(c(1,1,1), objective = NLL.norm.lin, regr1 = D$ws30, regr2 = D$ws30^2, response = Y)
@@ -183,21 +184,21 @@ D$y_inv_trans <- 1/( exp(y_p*lambda)+1 )^(1/lambda) * exp(y_p)
 #D$Season[D$month > 5] <- 1
 
 fitplot <- ggplot(data = D)+
-  geom_point(aes(x=ws30, y=pow.obs.norm, colour = "Observed power production (Transformed)"), size = 4, alpha = 0.6)+
-  geom_line(aes(x=ws30, y=y_inv_trans, colour="Inverse Transformation of the Normal model"), size = 2)+
-  geom_line(aes(x=ws30, y=betaModel.pow, colour="The directly fitted beta model"), size = 2)+
+  geom_point(aes(x=ws30, y=pow.obs.norm, colour = "Observed power production (Transformed)"), size = 3, alpha = 0.8)+
+  geom_line(aes(x=ws30, y=y_inv_trans, colour="Inverse Transformation of the Normal model"), size = 1)+
+  geom_line(aes(x=ws30, y=betaModel.pow, colour="The directly fitted beta model"), size = 1)+
   #geom_line(aes(x=ws30, y=Season_inv_trans, colour="InvS"))+
   labs(x = "Wind speeds", y="Norm power obs", colour = "")+
   theme_bw()+
   labs(colour = "")+
   ggtitle("Model fits")+
   theme(legend.background = element_rect(colour = "black"), legend.position = "top")+
-  scale_colour_manual(values = c("orange", "red", "blue"))
+  scale_colour_manual(values = c("orange", "black", "blue"))
 #scale_shape_manual(values = c(1:10))+
 #scale_colour_manual(values = c("blue", "yellow", "black"))
 
 resplot <- ggplot(data = D)+
-  geom_point(aes(x = ws30, y = pow.obs.norm - y_inv_trans, colour = "Normal model residuals"), size = 3, alpha = 0.5)+
+  #geom_point(aes(x = ws30, y = pow.obs.norm - y_inv_trans, colour = "Normal model residuals"), size = 3, alpha = 0.5)+
   geom_point(aes(x = ws30, y = pow.obs.norm - betaModel.pow, colour = "Beta model residuals"), size = 3, alpha = 0.5)+
   theme_bw()+
   scale_colour_manual(values = c("blue", "orange"))+
@@ -223,7 +224,8 @@ logLik_betaModel <- logLik(betaModel)#compare this to the one below
 #here, the negative log likelihood -L(y) consists of two terms: -sum(log(f(y))) and -sum(log(dg/dx)). The fit given by the objective function
 #is -log(f(y)) and thus the log-likelihood can be calculated as L(y) = sum(log(f(y))) + log(dg/dx) and now the
 #likelihoods from the two different models (beta and normal) can be compared:
-logLik.normTrans <- -norm.lin.par$objective+sum(log(-1/(D$pow.obs.norm*(-1+D$pow.obs.norm^0.26)))) #actual log-likelihood. It's greater than that of the beta model. This corresponds to the figure above :))
+
+logLik.normTrans <- -norm.lin.par$objective+sum(log(-1/(D$pow.obs.norm*(-1+D$pow.obs.norm^0.26)))) #actual log-likelihood. This corresponds to the figure above :))
 AIC.bm <- -2*logLik_betaModel+2*( length(betaModel$coefficients$mean) + length(betaModel$coefficients$precision) )
 AIC.normTrans <- -2*(logLik.normTrans) + 2*length(norm.lin.par$par) #aha, så passer det jo :)
 round(rbind("AIC Beta model: " = AIC.bm
