@@ -32,11 +32,6 @@ logRank <- function(data = actg, group = "tx", event = "event", time = "time"){
     #mutate(e = R.y * d.x / R.x)-> e[[paste(i)]]
   }
   
-  #test for groups == 1 #remnant curve
-  #if (HarringtonAndFleming == TRUE){
-  #w0 <- c(1, e$`0`$S.y[-length(e$`0`$S.y)]) #Ved ikke om antagelsen om at den første vægt = 1 er sand
-  #w1 <- c(1, e$`1`$S.y[-length(e$`1`$S.y)])
-  #} else {
   w <- 1 
   #}
   

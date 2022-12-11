@@ -438,6 +438,14 @@ theta.hat.both <- est.NUM$par#to avoid having to alter all names
 theta.hat.tx <- est.tx.NUM$par
 theta.hat.no.tx <- est.no.tx.NUM$par
 
+#LRT:
+chi_squared <- - 2 * ((est.tx.NUM$objective + est.no.tx.NUM$objective) - est.NUM$objective)
+(p_value <- 1 - pchisq(chi_squared, df = 1))
+#Here, we see that the treatment effect is statistically significant.
+```
+
+
+```{r}
 #weibull
 wei.nll <- function(omega, time = actg$time, event = actg$event){
   sigma <- omega[2]
@@ -491,6 +499,7 @@ ggplot(compare.table.treatment,aes(x = `weibull cumhaz tx`, y = `KM cumhaz tx`))
 
 ```{r}
 #numerical analysis above, analytical way below
+
 ```
 
 #### Formulate a model where one parameter indicate the treatment effect, find the MLE and compare with the result above.
@@ -601,10 +610,46 @@ chi_squared <- - 2 * (beta_hat$objective - beta_no_treatment_effect$objective)
 #Calculate profile likelihoods to ensure that the quadratic approximation by using Fischers Information matrix
 #is acceptable.
 
-beta.zero.sims <- seq(7.3,7.9,0.01)
-beta.one.sims <- seq(0.2,1.2,0.01)
-pL.beta0 <- apply(X = data.frame(beta.zero.sims,beta_hat$par[2]), MARGIN = 1 , FUN = nll.exp, time = actg$time, event = actg$event, treatment = actg$tx)
-pL.beta1 <- apply(X = data.frame(beta_hat$par[1],beta.one.sims), MARGIN = 1 , FUN = nll.exp, time = actg$time, event = actg$event, treatment = actg$tx)
+#WALD CI
+#SVAR: Den gamle metode bør være korrekt. Forskellen kommer fra om man regner H^-1 som en matrix eller et tal.
+#er rimelig sikker på at den bør behandles som matrix, da det anvender mest data.
+sd.former <- as.numeric(sqrt(diag(solve(hessian(beta_hat$par, func = nll.exp)))))
+
+Wald.CI_former <- round(beta_hat$par + matrix(c(-1,1), 2,2, byrow = T) * matrix(qnorm(0.975)*sd.former, 2,2, byrow = F), 3)
+
+#Her skal der laves pfl funktioner, som optimerer den parameter der ikke inputtes.
+nll.exp.beta0 <- function(beta0, time = actg$time, event = actg$event, treatment = actg$tx){
+  #dont want to make two functions so let beta1 = 0 if no treatment is not considered/used:
+  fun.beta1.tmp <- function(beta1, beta0){
+    h <- exp(- beta0 - beta1 * treatment)
+    H <- time/exp(beta0 + beta1*treatment)
+    nll.tmp <- -sum(event*log(h) - H)
+    return(nll.tmp)
+  }
+  nll <- nlminb(start = 0, fun.beta1.tmp, beta0 = beta0)$objective
+
+  return(nll)
+}
+
+nll.exp.beta1 <- function(beta1, time = actg$time, event = actg$event, treatment = actg$tx){
+  #dont want to make two functions so let beta1 = 0 if no treatment is not considered/used:
+  fun.beta0.tmp <- function(beta0, beta1){
+    h <- exp(- beta0 - beta1 * treatment)
+    H <- time/exp(beta0 + beta1*treatment)
+    nll.tmp <- -sum(event*log(h) - H)
+    return(nll.tmp)
+  }
+  nll <- nlminb(start = 0, fun.beta0.tmp, beta1 = beta1)$objective
+
+  return(nll)
+}
+
+beta.zero.sims <- seq(beta_hat$par[1]-3*sd.former[1],beta_hat$par[1]+3*sd.former[1],0.0001)
+beta.one.sims <- seq(beta_hat$par[2]-3*sd.former[2],beta_hat$par[2]+3*sd.former[2],0.0001)
+#pL.beta0 <- apply(X = data.frame(beta.zero.sims,beta_hat$par[2]), MARGIN = 1 , FUN = nll.exp, time = actg$time, event = actg$event, treatment = actg$tx)
+pL.beta0 <- sapply(X = beta.zero.sims, FUN = nll.exp.beta0)
+#pL.beta1 <- apply(X = data.frame(beta_hat$par[1],beta.one.sims), MARGIN = 1 , FUN = nll.exp, time = actg$time, event = actg$event, treatment = actg$tx)
+pL.beta1 <- sapply(X = beta.one.sims, FUN = nll.exp.beta1)
 
 par(mfrow=c(1,2))
 plot(beta.zero.sims
@@ -614,6 +659,7 @@ plot(beta.zero.sims
      ,xlab = expression(beta[0])
      ,ylab = "lp - max(lp)"
      ,ylim = c(-3.2,0))
+grid()
 abline(h = -qchisq(0.95, df = 1)/2, col = 2)
 plot(beta.one.sims
      , -(pL.beta1+max(-pL.beta1))
@@ -622,6 +668,7 @@ plot(beta.one.sims
      ,xlab = expression(beta[1])
      ,ylab = "lp - max(lp)"
      ,ylim = c(-3.2,0))
+grid()
 abline(h = -qchisq(0.95, df = 1)/2, col = 2)
 
 ```
@@ -630,27 +677,11 @@ abline(h = -qchisq(0.95, df = 1)/2, col = 2)
 #### Find the Wald confidence interval for the treatment parameter in the model above.
 
 ```{r}
-#CI:
-H_tr <- hessian(l.exp, beta_hat$par[2], beta_nuis = beta_hat$par[1])
-V_tr <- as.numeric(-1/H_tr)
-( Wald.CI_tr <- round(beta_hat$par[2] + c(-1,1)*qnorm(0.975) * sqrt(V_tr), digits=2) )
-H_nuis <- hessian(l.exp, beta_hat$par[1], beta_tr = beta_hat$par[2])
-V_nuis <- as.numeric(-1/H_nuis)
-( Wald.CI_nuis <- round(beta_hat$par[1] + c(-1,1)*qnorm(0.975) * sqrt(V_nuis), digits=2) )
-Wald.CI <- matrix(c(Wald.CI_nuis, Wald.CI_tr), 2,2, byrow = T)#KOMMENTAR: Jeg har regnet wald på en anden måde og får nu det samme som for likelihood based CI. Det lader til, at '-1/H' og 'diag(solve())' er forskellen på de to. Den første giver det samme som likelihood based, den anden giver det samme som confint. 20 linjer nede er de alle sammen sammenlignet.
-#SVAR: Den gamle metode bør være korrekt. Forskellen kommer fra om man regner H^-1 som en matrix eller et tal.
-#er rimelig sikker på at den bør behandles som matrix, da det anvender mest data.
-sd <- c(sqrt(V_nuis), sqrt(V_tr))
-sd.former <- as.numeric(sqrt(diag(solve(hessian(beta_hat$par, func = nll.exp)))))
-sd;sd.former
-
-Wald.CI_former <- round(beta_hat$par + matrix(c(-1,1), 2,2, byrow = T) * matrix(qnorm(0.975)*sd.former, 2,2, byrow = F), 3)
-
 #Direkte numerisk approksimation:
-CI.0 <- c(min(beta.zero.sims[-(pL.beta0+max(-pL.beta0)) > -qchisq(0.95, df = 1)/2])
-           ,max(beta.zero.sims[-(pL.beta0+max(-pL.beta0)) > -qchisq(0.95, df = 1)/2]))
-CI.1 <- c(min(beta.one.sims[-(pL.beta1+max(-pL.beta1)) > -qchisq(0.95, df = 1)/2])
-           ,max(beta.one.sims[-(pL.beta1+max(-pL.beta1)) > -qchisq(0.95, df = 1)/2]))
+CI.0 <- round(c(min(beta.zero.sims[-(pL.beta0+max(-pL.beta0)) > -qchisq(0.95, df = 1)/2])
+           ,max(beta.zero.sims[-(pL.beta0+max(-pL.beta0)) > -qchisq(0.95, df = 1)/2])), 3)
+CI.1 <- round(c(min(beta.one.sims[-(pL.beta1+max(-pL.beta1)) > -qchisq(0.95, df = 1)/2])
+           ,max(beta.one.sims[-(pL.beta1+max(-pL.beta1)) > -qchisq(0.95, df = 1)/2])),3)
 
 cat(paste("Wald Confidence intervals:"
       ,paste("\nbeta_0 = ", round(beta_hat$par[1], 4), " [95% CI: ", Wald.CI_former[1,1],", ", Wald.CI_former[1,2],"]")
@@ -954,7 +985,6 @@ beta_0_theo;beta_1_theo
 
 
 ```{r}
-( sd_tr <- sqrt(V_tr) )
 par(mfrow = c(1,2))
 plot(beta.zero.sims
      , -(pL.beta0+max(-pL.beta0))
@@ -964,8 +994,8 @@ plot(beta.zero.sims
      ,ylab = "lp - max(lp)"
      ,ylim = c(-3.2,0))
 abline(h = -qchisq(0.95, df = 1)/2, col = 2)
-abline(v = Wald.CI[1,], col = 6)
-text(x = Wald.CI[1,1]+.15, y = -2.4, "Wald CI", col = 6)
+abline(v = Wald.CI_former[1,], col = 6)
+text(x = Wald.CI_former[1,1]+.15, y = -2.3, "Wald CI", col = 6)
 text(x = CI.0[1]+.05, y = -2.5, "CI", col = 2)
 abline(v = c(CI.0), lty = "dashed", col = 2)
 plot(beta.one.sims
@@ -976,8 +1006,8 @@ plot(beta.one.sims
      ,ylab = "lp - max(lp)"
      ,ylim = c(-3.2,0))
 abline(h = -qchisq(0.95, df = 1)/2, col = 2)
-abline(v = Wald.CI[2,], col = 6)
-text(x = Wald.CI[2,1]+0.25, y = -1.6, "Wald CI", col = 6)
+abline(v = Wald.CI_former[2,], col = 6)
+text(x = Wald.CI_former[2,1]+0.25, y = -1.5, "Wald CI", col = 6)
 text(x = CI.1[1]+0.09, y = -1.7, "CI", col = 2)
 abline(v = c(CI.1),lty = "dashed", col = 2)
 ```
