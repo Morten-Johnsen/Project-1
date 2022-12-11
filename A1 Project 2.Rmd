@@ -126,32 +126,27 @@ x2 <- log.data$AIDS_yes[2]
 n1 <- log.data$n[1] #har rettet fra [2]
 n2 <- log.data$n[2]
 
-(theta.hat <- log(x1/(n1-x1)*(n2-x2)/x2))
+theta.hat <- log(x1/(n1-x1)*(n2-x2)/x2)
 
 eta.start <- log(x2/(n2-x2))
 
-L_theta <- function(eta){ 
-  return(-log(exp(theta.hat*x1+eta*(x1+x2))/((1+exp(theta.hat+eta))^n1*(1+exp(eta))^n2)))
+L.both <- function(theta){
+  theta.hat <- theta[1]
+  eta.hat <- theta[2]
+  nll <- -log(exp(theta.hat*x1+eta.hat*(x1+x2))/((1+exp(theta.hat+eta.hat))^n1*(1+exp(eta.hat))^n2))
+  return(nll)
 }
-(eta.hat <- nlminb(eta.start, objective = L_theta)$par)
-
-#Now we can construct CIs based on the Likelihood function
-L <- function(theta){
-  return(-log(exp(theta*x1+eta.hat*(x1+x2))/((1+exp(theta+eta.hat))^n1*(1+exp(eta.hat))^n2)))
-}
-
-(theta.hat <- nlminb(start = 1, objective = L)$par)
-
-var <- solve(hessian(func <- L, x = theta.hat))
-sd <- as.numeric(sqrt(var))
-CI <- p.hat + c(-1,1)*qnorm(c(0.975))*sd/sqrt(sum(log.data$n)) #Så skal det her vel ikke bruges?
-
-#jeg tænkte på, om ikke det var dette CI som kunne bruges til at teste vha. likelihood, om theta.hat overlapper med 0:
-H.L.theta <- hessian(func = L, x = theta.hat)
-V.L.theta <- solve(H.L.theta)
-(CI.theta <- theta.hat + c(-1,1) * qnorm(0.975) * sqrt(V.L.theta))
 #KOMMENTAR:SLUT. Dette CI.theta kan vel bruges til at sige noget om, at da det ikke indeholder 0, så må effekten være signifikant?
 #Det virker rigtigt. Hvilket slide/hvilken side i bogen er brugt? Slide 22, uge 3. Her er pi_1 = x1/n1 og pi_2 = x2/n2.
+
+ests <- nlminb(start = c("theta" = 0, "eta" = 0), objective = L.both)
+ests$par
+H.likelihood.method <- hessian(func = L.both, x = ests$par)
+V.likelihood.method <- diag(solve(H.likelihood.method))
+sd.likelihood.method <- sqrt(V.likelihood.method)
+(CI.theta <- theta.hat + c(-1,1) * qnorm(0.975) * sd.likelihood.method[1])
+theta.hat
+
 ```
 
 Result: By means of the usual non-likelihood method of proportion testing it has been shown that there is a statistically significant effect of the treatment.
@@ -367,7 +362,7 @@ plot(beta.one.sims
      ,ylab = "lp - max(lp)")
 abline(h = -qchisq(0.95, df = 1)/2, col = 2)
 abline(v = c(W.CI.1), col = 6)
-text(x = W.CI.1[1]+0.2, y = -3, "Wald CI", col = 6)
+text(x = W.CI.1[1]+0.25, y = -3, "Wald CI", col = 6)
 text(x = CI.1[1]+0.1, y = -2.5, "CI", col = 2)
 abline(v = c(CI.1),lty = "dashed", col = 2)
 ```
