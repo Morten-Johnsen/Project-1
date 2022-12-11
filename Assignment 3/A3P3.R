@@ -159,16 +159,23 @@ N.nll(p=p, n.dist=m, y=D$SLV)
 opt2 <- nlminb(start=p, N.nll, n.dist=m, y=D$SLV)
 #opt2$par[(m+1+1):(2*m)] = opt2$par[(m+1):(2*m-1)] + exp(opt2$par[(m+1+1):(2*m)])
 (pars2 <- N.mix.pw2pn(n.dist=m,opt2$par[1:m],opt2$par[(m+1):(2*m)],opt2$par[(2*m+1):(3*m-1)]))
-ggplot(D)+
-  geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
-  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = pars2$mu[1],
-                                                        sd = pars2$sigma[1]), color = 'red') +
-  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = pars2$mu[2],
-                                                        sd = pars2$sigma[2]), color = 'orange') +
-  ggtitle("Normal distribution fitted to SLV")
 
 D$interval <- seq(min(D$SLV), max(D$SLV), length.out = length(D$SLV))
 D$dist2 <- sapply(D$interval, final.Dist, delta = pars2$delta, mu = pars2$mu, sigma = pars2$sigma)
+
+ggplot(D)+
+  geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
+  stat_function(aes(colour='1st'), fun = dnorm, n = dim(D)[1], args = list(mean = pars2$mu[1],
+                                                        sd = pars2$sigma[1])) +
+  stat_function(aes(colour='2nd'), fun = dnorm, n = dim(D)[1], args = list(mean = pars2$mu[2],
+                                                        sd = pars2$sigma[2])) +
+  geom_line(aes(x = interval, y = dist2, colour = "Combined"), lwd=1.1)+
+  scale_colour_manual(values = c("blue", "yellow", "springgreen4"))+
+  labs(colour = "", x = "SLV")+
+  theme_bw()+
+  ggtitle("(2) Normal mixture model fitted to SLV")
+
+
 ggplot(D)+
   geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
   geom_line(aes(x = interval, y = dist2), colour = "blue")+
@@ -188,15 +195,23 @@ opt3$par
 #opt3$par[(m+1+1):(2*m)] = opt3$par[(m+1):(2*m-1)] + cumsum(exp(opt3$par[(m+1+1):(2*m)]))
 #opt3$par
 (pars3 <- N.mix.pw2pn(n.dist=m,opt3$par[1:m],opt3$par[(m+1):(2*m)],opt3$par[(2*m+1):(3*m-1)]))
+
+D$interval <- seq(min(D$SLV), max(D$SLV), length.out = length(D$SLV))
+D$dist3 <- sapply(D$interval, final.Dist, delta = pars3$delta, mu = pars3$mu, sigma = pars3$sigma)
+
 ggplot(D)+
   geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
-  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = pars3$mu[1],
-                                                        sd = pars3$sigma[1]), color = 'red') +
-  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = pars3$mu[2],
-                                                        sd = pars3$sigma[2]), color = 'orange') +
-  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = pars3$mu[3],
-                                                        sd = pars3$sigma[3]), color = 'blue') +
-  ggtitle("Normal distribution fitted to SLV")
+  stat_function(aes(colour='1st'), fun = dnorm, n = dim(D)[1], args = list(mean = pars3$mu[1],
+                                                        sd = pars3$sigma[1]))+
+  stat_function(aes(colour='2nd'), fun = dnorm, n = dim(D)[1], args = list(mean = pars3$mu[2],
+                                                        sd = pars3$sigma[2])) +
+  stat_function(aes(colour='3rd'), fun = dnorm, n = dim(D)[1], args = list(mean = pars3$mu[3],
+                                                        sd = pars3$sigma[3])) +
+  geom_line(aes(x = interval, y = dist3, colour = "Combined"))+
+  scale_colour_manual(values = c("blue", "yellow","turquoise3", "springgreen4"))+
+  labs(colour = "", x = "SLV")+
+  theme_bw()+
+  ggtitle("(3) Normal mixture model fitted to SLV")
 
 D$interval <- seq(min(D$SLV), max(D$SLV), length.out = length(D$SLV))
 D$dist3 <- sapply(D$interval, final.Dist, delta = pars3$delta, mu = pars3$mu, sigma = pars3$sigma)
@@ -289,11 +304,11 @@ melt(data.frame("Mu1" = Mu[Code!=1,1], "Mu2" = Mu[Code!=1,2])) %>%
 #   geom_histogram(aes(x = value), colour = "white")+
 #   facet_wrap(~variable, scales =  "free")
 
-ParametricBootCI <- data.frame(round(cbind(c(pars2$mu, pars2$sigma, pars2$delta),
+ParametricBootCI <- data.frame(round(cbind(c(pars2$mu, pars2$sigma^2, pars2$delta),
             rbind(quantile(Mu[ ,1],prob=c(0.025,0.975)),
             quantile(Mu[ ,2],prob=c(0.025,0.975)),
-            quantile(Sigma[ ,1],prob=c(0.025,0.975)),
-            quantile(Sigma[ ,2],prob=c(0.025,0.975)),
+            quantile(Sigma[ ,1],prob=c(0.025,0.975))^2,
+            quantile(Sigma[ ,2],prob=c(0.025,0.975))^2,
             quantile(Delta[ ,1],prob=c(0.025,0.975)),
             quantile(Delta[ ,2],prob=c(0.025,0.975)))),
       digits = 5)); colnames(ParametricBootCI) <- c("MLE", "2.5%", "97.5%"); rownames(ParametricBootCI) <- c("Mu1", "Mu2", "Sigma1", "Sigma2", "Delta1", "Delta2")
@@ -354,18 +369,18 @@ N.pl <- function(eta0, n.dist, y, first=T){ #to be used for PL of the 2nd varian
 
 eta1.w <- seq(opt2$par[m+1]-6*sqrt(V.w2)[m+1],
               opt2$par[m+1]+6*sqrt(V.w2)[m+1],
-              length=50)
+              length=100)
 eta2.w <- seq(opt2$par[2*m]-6*sqrt(V.w2)[2*m],
              opt2$par[2*m]+6*sqrt(V.w2)[2*m],
-            length=50)
+            length=100)
 m <- 2
 N.llp <- sapply(X = eta1.w, FUN=N.pl, n.dist=m, y=D$SLV)
 N.llp2 <- sapply(X = eta2.w, FUN=N.pl, n.dist=m, y=D$SLV, first=F)
 
 plot(eta1.w,exp(N.llp-(max(N.llp))),type="l",
      ylab = "Normalized likelihood",
-     xlab = "eta_1",
-     main = "First variance param of 2NMM") #smart Jan-plot
+     xlab = expression(paste(eta[1])),
+     main = "First variance param of 2 NMM") #smart Jan-plot
 grid()
 lines(range(eta1.w),
       exp(-c(1,1) * qchisq(0.95,df=1)/2),
@@ -497,12 +512,20 @@ mle2.HMM <- N.HMM.mle.nlminb(x=D$SLV,m=m,mu0=mu,sigma0=sigma,gamma0=gamma)
 #mllk1 <- N.HMM.mllk(parvect=c(mean(D$SLV),log(sd(D$SLV))),x=D$SLV,m=1)
 #mle1.HMM <- N.HMM.mle.nlminb(x=D$SLV,m=1,mu0=mean(D$SLV),sigma0=sd(D$SLV),gamma0=c())
 
+D$interval <- seq(min(D$SLV), max(D$SLV), length.out = length(D$SLV))
+D$distHMM2 <- sapply(D$interval, final.Dist, delta = mle2.HMM$delta, mu = mle2.HMM$mu,
+                     sigma = mle2.HMM$sigma)
+
 ggplot(D)+
   geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
-  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = mle2.HMM$mu[1],
-                                                        sd = mle2.HMM$sigma[1]), color = 'red') +
-  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = mle2.HMM$mu[2],
-                                                        sd = mle2.HMM$sigma[2]), color = 'orange') +
+  stat_function(aes(colour='1st'), fun = dnorm, n = dim(D)[1], args = list(mean = mle2.HMM$mu[1],
+                                                        sd = mle2.HMM$sigma[1])) +
+  stat_function(aes(colour='2nd'), fun = dnorm, n = dim(D)[1], args = list(mean = mle2.HMM$mu[2],
+                                                        sd = mle2.HMM$sigma[2])) +
+  geom_line(aes(x = interval, y = distHMM2, colour = "Combined"))+
+  scale_colour_manual(values = c("blue", "yellow","springgreen4"))+
+  labs(colour = "", x = "SLV")+
+  theme_bw()+
   ggtitle("HMM with 2 normal distributions fitted to SLV")
 
 m3 <- 3
@@ -513,15 +536,21 @@ gamma3 <- matrix(rep(1/3,9), ncol=3,byrow=T) #arbitrary 0.95, 0.25, 0.25
 #mllk3 <- N.HMM.mllk(parvect=wpars3.HMM,x=D$SLV,m=m0)
 
 mle3.HMM <- N.HMM.mle.nlminb(x=D$SLV,m=m3,mu0=mu3,sigma0=sigma3,gamma0=gamma3)
+D$distHMM3 <- sapply(D$interval, final.Dist, delta = mle3.HMM$delta, mu = mle3.HMM$mu,
+                     sigma = mle3.HMM$sigma)
 
 ggplot(D)+
   geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
-  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = mle3.HMM$mu[1],
-                                                        sd = mle3.HMM$sigma[1]), color = 'red') +
-  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = mle3.HMM$mu[2],
-                                                        sd = mle3.HMM$sigma[2]), color = 'orange') +
-  stat_function(fun = dnorm, n = dim(D)[1], args = list(mean = mle3.HMM$mu[3],
-                                                        sd = mle3.HMM$sigma[3]), color = 'blue') +
+  stat_function(aes(colour='1st'), fun = dnorm, n = dim(D)[1], args = list(mean = mle3.HMM$mu[1],
+                                                        sd = mle3.HMM$sigma[1])) +
+  stat_function(aes(colour='2nd'), fun = dnorm, n = dim(D)[1], args = list(mean = mle3.HMM$mu[2],
+                                                        sd = mle3.HMM$sigma[2])) +
+  stat_function(aes(colour='3rd'), fun = dnorm, n = dim(D)[1], args = list(mean = mle3.HMM$mu[3],
+                                                        sd = mle3.HMM$sigma[3])) +
+  geom_line(aes(x = interval, y = distHMM2, colour = "Combined"))+
+  scale_colour_manual(values = c("blue", "yellow","turquoise3", "springgreen4"))+
+  labs(colour = "", x = "SLV")+
+  theme_bw()+
   #xlim(c(-0.985,-0.90))+
   ggtitle("HMM with 3 normal distributions fitted to SLV")
 
@@ -683,11 +712,11 @@ melt(data.frame("Mu1" = Mu[Code!=1,1], "Mu2" = Mu[Code!=1,2],
   theme_bw()
 
 
-ParametricBootCI <- data.frame(round(cbind(c(mle2.HMM$mu, mle2.HMM$sigma, mle2.HMM$delta, c(mle2.HMM$gamma[1,],mle2.HMM$gamma[2,])),
+ParametricBootCI <- data.frame(round(cbind(c(mle2.HMM$mu, mle2.HMM$sigma^2, mle2.HMM$delta, c(mle2.HMM$gamma[1,],mle2.HMM$gamma[2,])),
                                            rbind(quantile(Mu[Code!=1 ,1],prob=c(0.025,0.975)),
                                                  quantile(Mu[Code!=1 ,2],prob=c(0.025,0.975)),
-                                                 quantile(Sigma[Code!=1 ,1],prob=c(0.025,0.975)),
-                                                 quantile(Sigma[Code!=1 ,2],prob=c(0.025,0.975)),
+                                                 quantile(Sigma[Code!=1 ,1],prob=c(0.025,0.975))^2,
+                                                 quantile(Sigma[Code!=1 ,2],prob=c(0.025,0.975))^2,
                                                  quantile(Delta[Code!=1 ,1],prob=c(0.025,0.975)),
                                                  quantile(Delta[Code!=1 ,2],prob=c(0.025,0.975)),
                                                  quantile(GAMMA[Code!=1 ,1],prob=c(0.025,0.975)),
@@ -695,7 +724,7 @@ ParametricBootCI <- data.frame(round(cbind(c(mle2.HMM$mu, mle2.HMM$sigma, mle2.H
                                                  quantile(GAMMA[Code!=1 ,3],prob=c(0.025,0.975)),
                                                  quantile(GAMMA[Code!=1 ,4],prob=c(0.025,0.975)))),
                                      digits = 5)); colnames(ParametricBootCI) <- c("MLE", "2.5%", "97.5%"); rownames(ParametricBootCI) <- c("Mu1", "Mu2",
-                                                                                                                                            "Sigma1", "Sigma2",
+                                                                                                                                            "Sigma1^2", "Sigma2^2",
                                                                                                                                             "Delta1", "Delta2",
                                                                                                                                             "GAMMA11", "GAMMA12",
                                                                                                                                             "GAMMA21", "GAMMA22")
