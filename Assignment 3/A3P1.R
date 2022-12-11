@@ -96,7 +96,7 @@ e <- matrix(c(e1,e2), ncol=2, byrow=F)
 par(mfrow = c(1,1))
 e_vec <- D$residuals
 
-plot(e1, e2, xlab = "e1", ylab = "e2")
+plot(e1, e2, xlab = "e1", ylab = "e2", main="Correlation between error and the error at the previous time step")
 grid()
 
 #1.2
@@ -151,6 +151,12 @@ sd.sigma.sq <- se[1]
 (sigma.sq.lower.wald <- sigma.sq.hat - sd.sigma.sq*qnorm(0.975))
 (sigma.sq.upper.wald <- sigma.sq.hat + sd.sigma.sq*qnorm(0.975))
 
+str <-expression(paste(sigma^2))
+
+cat(" = ", round(sigma.sq.hat,2), "95% WALD CI [",  round(sigma.sq.lower.wald,2),",",round(sigma.sq.upper.wald,2),"]"
+     ,"\n = ", round(phi.hat,3), "95% WALD CI [",round(phi.lower.wald,3),",",round(phi.upper.wald,3),"]"
+)#first is variance, second is rho
+
 phi_interval <- seq(phi.hat-4*se[2],
                     phi.hat+4*se[2],
                     length=200)
@@ -180,7 +186,7 @@ alpha <- c(0.01, .05, .1, .5, 1)
 contour(x = sigma.sq_interval, y = phi_interval,
         z = z,
         levels = exp(-qchisq(1 - alpha, df = 2) / 2),
-        labels = alpha, xlab="sigma.squared",ylab="rho"
+        labels = alpha, xlab=expression(paste(sigma^2)),ylab=expression(paste(rho))
         ,main = "Contour plot with confidence regions")
 grid()
 
@@ -198,7 +204,9 @@ fig2 <- add_trace(p = fig, data = intervals, x = ~sigma.sq, y = ~phi, z = ~likel
 fig3 <- add_trace(p = fig2
                   , type = "scatter"
                   , x = sigma.sq.hat
-                  , y = phi.hat)
+                  , y = phi.hat
+                  , xlab=expression(paste(sigma^2)), ylab=expression(paste(rho))
+                  )
 
 fig3
 
@@ -223,6 +231,7 @@ p.value.LRT <- 1 - pchisq(chi.squared, df = 1)
 waldTestStatistic <- phi.hat/sd.phi
 wald.p.value <- 2 * (1 - pnorm(waldTestStatistic)) 
 
+
 #### 3.1 - Compare the found numerical information matrix with the algebraic form ####
 #FROM PAGE 72 in the course textbook
 V_theory <- function(sigma.sq, phi, y){
@@ -235,6 +244,10 @@ V_theory <- function(sigma.sq, phi, y){
 }
 V_theory(sigma.sq.hat, phi.hat, y = ws.and.ws.squared$residuals)
 V
+#The information:
+hessian(bn_nll, opt_bivariate_normal$par, e = e)
+solve(V)
+solve(V_theory(sigma.sq.hat, phi.hat, y = ws.and.ws.squared$residuals))
 #MAGNIFIQUE!!!
 
 #Relatively large diagnonal elements in V as compared to the diagonal elements (meaning that
@@ -269,7 +282,8 @@ par(mfrow = c(2,2))
 
 Information_matrix <- solve(V_theory(sigma.sq.hat, phi.hat, y = ws.and.ws.squared$residuals))
 
-plot(phi_interval,exp(-(nllp-min(nllp))),type="l", main = "rho profile likelihood")
+plot(phi_interval,exp(-(nllp-min(nllp))),type="l", main = expression(paste(rho, " profile likelihood")),
+     xlab=expression(paste(rho)))
 grid()
 lines(range(phi_interval),
       exp(-c(1,1) * qchisq(0.95,df=1)/2),
@@ -284,7 +298,8 @@ lines(phi_interval
       , lty = 3)
 text(x = 0.45, y = 0.8, "Quadratic \napproximation", col = 4)
 
-plot(phi_interval,-(nllp-min(nllp)),type="l", main = "rho log-profile likelihood")
+plot(phi_interval,-(nllp-min(nllp)),type="l", main = expression(paste(rho," log-profile likelihood")),
+     xlab=expression(paste(rho)))
 grid()
 lines(range(phi_interval),
       -c(1,1) * qchisq(0.95,df=1)/2,
@@ -297,7 +312,7 @@ lines(phi_interval
       , col = 4
       , lwd = 2
       , lty = 3)
-text(x = 0.45, y = -0.8, "Quadratic \napproximation", col = 4)
+text(x = 0.45, y = -1.3, "Quadratic \napproximation", col = 4)
 
 ## pf based CI
 (phi.lower.pf <- min(phi_interval[exp(-(nllp-min(nllp))) >= exp(-qchisq(0.95,df=1)/2)]))
@@ -348,7 +363,8 @@ z_interval <- seq(opt.z$par[2]-5*sd[2],
 
 nllp.z <- sapply(z_interval, FUN = transformed_nll_pf, e = e)
 
-plot(z_interval,exp(-(nllp.z-min(nllp.z))), type="l", main = TeX("Profile likelihood for z"))
+plot(z_interval,exp(-(nllp.z-min(nllp.z))), type="l", main = expression(paste("Profile likelihood for z")),
+     xlab="z")
 grid()
 lines(range(z_interval),
       exp(-c(1,1) * qchisq(0.95,df=1)/2),
@@ -360,7 +376,8 @@ lines(z_interval
       , lwd = 2
       , lty = 3)
 text(x = 0.45, y = 0.8, "Quadratic \napproximation", col = 4)
-plot(z_interval,-(nllp.z-min(nllp.z)),type="l", main = TeX("Profile log-likelihood for z"))
+plot(z_interval,-(nllp.z-min(nllp.z)),type="l", main = expression(paste("Profile log-likelihood for z")),
+     xlab="z")
 grid()
 lines(range(z_interval),
       -c(1,1) * qchisq(0.95,df=1)/2,
@@ -373,7 +390,7 @@ lines(z_interval
       , col = 4
       , lwd = 2
       , lty = 3)
-text(x = 0.45, y = -0.8, "Quadratic \napproximation", col = 4)
+text(x = 0.45, y = -1.5, "Quadratic \napproximation", col = 4)
 
 # 5 - Estimate the parameters of the AR model (Example 11.1) when conditioning on e1 and then full estimation
 #compare with the estimation above
@@ -411,6 +428,10 @@ opt_p298_cond <- nlminb(c("sigma.sq" = 1, "phi" = 0), p298_cond, e = e_vec)
 opt_p298_cond$par
 
 opt_bivariate_normal$par
+cat("Conditional = ", round(opt_p298_full$par[1],2),",", round(opt_p298_full$par[2],3)
+    ,"\nFull = ", round(opt_p298_cond$par[1],2),",", round(opt_p298_cond$par[2],3)
+    ,"\nMVN = ", round(opt_bivariate_normal$par[1],2),",", round(opt_bivariate_normal$par[2],3)
+)
 # giver god mening at variansen bliver mindre ift. det der ses i den direkte covarians
 #beregning, da vi nu har anvendt en AR(1) til at reducere spredningen i residualerne
 #dermed er estimatet på≈8 et udtryk for spredningen sigma.sq_u (se egne noter på bagerste
@@ -461,8 +482,18 @@ linear_model <- nlminb(c(1,0,0), linear_model_nll)
 chi.squared <- - 2 * (combined_model$objective - linear_model$objective)
 p.value.LRT <- 1 - pchisq(chi.squared, df = 1)
 
-(AIC_combined <- 2*combined_model$objective + 2*5)
+(AIC_combined <- 2*combined_model$objective + 2*5)#mangler change of variable, men sammenligningen holder vel stadig
 (AIC_linear <- 2*linear_model$objective + 2*3)
+
+logLik.normTrans <- -linear_model$objective+sum(log(-1/(D$pow.obs.norm*(-1+D$pow.obs.norm^0.26))))#change of variable
+(AIC.normTrans <- -2*(logLik.normTrans) + 2*length(linear_model$par))
+
+logLik.normTrans.comb <- -combined_model$objective+sum(log(-1/(D$pow.obs.norm*(-1+D$pow.obs.norm^0.26))))
+(AIC.normTrans.comb <- -2*(logLik.normTrans.comb) + 2*length(combined_model$par))
+
+#til beregning af sigma:
+var.lin.mod <- 1/length(D$transformed.pow.obs.norm) * sum( (D$transformed.pow.obs.norm - ( linear_model$par[1] + linear_model$par[2]*D$ws30 + linear_model$par[3]*D$ws30^2 ))^2  )
+var.comb.mod <- combined_model$par[5]
 
 #discussion:
 #(se bagerste side i bogen med egne noter)
