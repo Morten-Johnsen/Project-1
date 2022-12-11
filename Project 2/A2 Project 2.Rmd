@@ -58,87 +58,87 @@ $$ Here $\theta$ is calculated as: $$
 $$
 
 ```{r}
-nll.log <- function(theta, event, n, treatment){
-  
-  beta0 <- theta[1]
-  beta1 <- theta[2]
-  
-  theta <- exp(beta0 + beta1 * treatment)/(1 + exp(beta0 + beta1 * treatment))
-  
-  nll <- -sum(log(theta)*event  + log(1-theta)*(n - event))
+nll.bin <- function(theta, event = log.data$AIDS_yes
+                    , n = log.data$n
+                    , treatment = c(1,0)){
+  beta_0 <- theta[1]
+  beta_1 <- theta[2]
+  theta <- exp(beta_0+beta_1*treatment)/(1+exp(beta_0+beta_1*treatment))
+
+  nll <- -sum(log(theta)*event + (n-event)*log((1 - theta)))
   return(nll)
 }
-
-# For AZT treatment:
-log.reg <- nlminb(start = c(1,1), objective = nll.log, event = log.data$AIDS_yes, n = log.data$n, treatment = c(1,0))
-
-beta0 <- log.reg$par[1]
-beta1 <- log.reg$par[2]
+log.reg <- nlminb(start = c(0,0), objective = nll.bin)
+(beta <- log.reg$par)
+beta0 <- beta[1]
+beta1 <- beta[2]
+sd_beta <- sqrt(diag(solve(hessian(x = beta, func = nll.bin))))
 ```
+Calculate 95% wald confidence interval for $\beta_1$ and subsequently for the odds ratio. Hereafter we justify the use of the Wald CI by examining whether the score function show linearity around the MLE (p. ).
+
+```{r}
+sd.beta0 <- sd_beta[1]
+sd.beta1 <- sd_beta[2]
+W.CI.0 <- round(beta0 + c(-1,1)*qnorm(0.975)*sd.beta0,4)
+W.CI.1 <- round(beta1 + c(-1,1)*qnorm(0.975)*sd.beta1,4)
+```
+
+Comparison:
 
 ```{r}
 logistic <- data.frame("AZT" = c(rep(1,170), rep(0,168))
                        ,"AIDS_yes" = c(rep(c(1,0),c(25,170-25)), rep(c(1,0), c(44, 168-44))))
 
 fit.glm <- glm(AIDS_yes ~ AZT, data = logistic, family = binomial)
-print(cat(paste0("with glm model: ", coef(fit.glm)
+cat(paste0("with glm model: ", coef(fit.glm)
   ,"\nBy hand (according to slide 19 lect 4): "
-  ,"\nbeta_0 = ", log.reg$par[1], ", beta_1 = ", log.reg$par[2])))
+  ,"\nbeta_0 = ", beta0, ", beta_1 = ", beta1))
 
 ```
-
-Calculate 95% wald confidence interval for $\beta_1$ and subsequently for the odds ratio. Hereafter we justify the use of the Wald CI by examining whether the score function show linearity around the MLE (p. ).
 
 ```{r}
-sd <- sqrt(diag(solve(hessian(func = nll.log, x = c(beta0, beta1), event = log.data$AIDS_yes, n = log.data$n, treatment = c(1,0)))))
-sd.beta0 <- sd[1]
-sd.beta1 <- sd[2]
-
-beta0.wald.CI <- beta0 + c(-1,1)*dnorm(0.975)*sd.beta0
-beta1.wald.CI <- beta1 + c(-1,1)*dnorm(0.975)*sd.beta1
-
-#Test regularity
-score.nll.log <- function(theta){
-  
-  event <- log.data$AIDS_yes
-  n <- log.data$n
-  treatment <- c(1,0)
-  
-  beta0 <- theta[1]
-  beta1 <- theta[2]
-  
-  theta <- exp(beta0 + beta1 * treatment)/(1 + exp(beta0 + beta1 * treatment))
-  
-  score <- -sum(event/theta - (1 - event)/(1 - theta))
-  return(score)
-}
+# #Test regularity #aldready tested in A1P1
+# score.nll.log <- function(theta){
+#   
+#   event <- log.data$AIDS_yes
+#   n <- log.data$n
+#   treatment <- c(1,0)
+#   
+#   beta0 <- theta[1]
+#   beta1 <- theta[2]
+#   
+#   theta <- exp(beta0 + beta1 * treatment)/(1 + exp(beta0 + beta1 * treatment))
+#   
+#   score <- -sum(event/theta - (1 - event)/(1 - theta))
+#   return(score)
+# }
 
 
-beta0.test.range <- seq(beta0.wald.CI[1], beta0.wald.CI[2], abs(0.01*beta0))
-beta1.test.range <- seq(beta1.wald.CI[1], beta1.wald.CI[2], abs(0.01*beta1))
+#beta0.test.range <- seq(beta0.wald.CI[1], beta0.wald.CI[2], abs(0.01*beta0))
+#beta1.test.range <- seq(beta1.wald.CI[1], beta1.wald.CI[2], abs(0.01*beta1))
 
-res0 <- apply(cbind(beta0.test.range, beta1), MARGIN = 1, FUN = score.nll.log)
+#res0 <- apply(cbind(beta0.test.range, beta1), MARGIN = 1, FUN = score.nll.log)
 
-res1 <- apply(cbind(beta0, beta1.test.range), MARGIN = 1, FUN = score.nll.log)
+#res1 <- apply(cbind(beta0, beta1.test.range), MARGIN = 1, FUN = score.nll.log)
 
-par(mfrow = c(1,2))
-plot(beta0.test.range, res0, main = TeX("Score linearity for $\\beta_0$")
-     ,xlab = TeX("$\\beta_0$"), ylab = "Score", pch = 16)
-abline(lm(res0 ~ beta0.test.range), col = 2, lwd = 2)
-grid()
-
-plot(beta1.test.range, res1, main = TeX("Score linearity for $\\beta_1$")
-     ,xlab = TeX("$\\beta_1$"), ylab = "Score", pch = 16)
-abline(lm(res1 ~ beta1.test.range), col = 2, lwd = 2)
-grid()
+# par(mfrow = c(1,2))
+# plot(beta0.test.range, res0, main = TeX("Score linearity for $\\beta_0$")
+#      ,xlab = TeX("$\\beta_0$"), ylab = "Score", pch = 16)
+# abline(lm(res0 ~ beta0.test.range), col = 2, lwd = 2)
+# grid()
+# 
+# plot(beta1.test.range, res1, main = TeX("Score linearity for $\\beta_1$")
+#      ,xlab = TeX("$\\beta_1$"), ylab = "Score", pch = 16)
+# abline(lm(res1 ~ beta1.test.range), col = 2, lwd = 2)
+# grid()
 
 ```
 
-Odds ratio = $exp(\beta_1)$ = `r exp(beta1)`, 95% CI [`r exp(c(beta1.wald.CI[1], beta1.wald.CI[2]))`]. Thus for the individuals receiving the AZT treatment, the odds of developing AIDS or dying is reduced by a factor 0.486 95% CI [0.45, 0.52].
+Odds ratio = $exp(\beta_1)$ = `r exp(beta1)`, 95% CI [`r exp(c(W.CI.1[1], W.CI.1[2]))`]. Thus for the individuals receiving the AZT treatment, the odds of developing AIDS or dying is reduced by a factor 0.486 95% CI [0.28, 0.84].
 
 ```{r, include = F}
 exp(beta1)
-exp(c(beta1.wald.CI[1], beta1.wald.CI[2]))
+exp(c(W.CI.1[1], W.CI.1[2]))
 ```
 
 ### Test the hypothesis of no effect of AZT on AIDS using:
@@ -165,6 +165,7 @@ nll.log.no.effect <- function(theta, event, n, treatment){
 log.reg.no.effect <- nlminb(start = 1, objective = nll.log.no.effect
                         , event = sum(log.data$AIDS_yes)
                         , n = sum(log.data$n), treatment = 0)
+log.reg.no.effect$par
 ```
 
 Run the LRT (assuming regularity of the likelihoods (*page 36*)):
@@ -202,7 +203,7 @@ S_2 &= Y_1-\frac{m_1\cdot e^{\beta_0+\beta_1}}{1+e^{\beta_0+\beta_1}}
 S=[S_1,S_2]^T
 $$
 Where $Y_1$ are events in treatment group and $Y_2$ are events in control group. And then $m_1$ are persons in treatment group and $m_2$ persons in control group. HOWEVER, as this is the score test, it is important to note that $\beta_1$ will not be set equal to the $\beta_1=-0.72$ from earlier but instead $\beta_{1,H_0}=0$ under our null hypothesis.
-
+S
 ```{r}
 Y_1 <- as.numeric(log.data$AIDS_yes[log.data$AZT=='Yes'])
 Y_2 <- as.numeric(log.data$AIDS_yes[log.data$AZT=='No'])

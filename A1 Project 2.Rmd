@@ -261,34 +261,51 @@ nll.bin <- function(theta, event = log.data$AIDS_yes
 beta <- nlminb(start = c(0,0), objective = nll.bin)$par
 sd <- sqrt(diag(solve(hessian(x = beta, func = nll.bin))))
 ###NEW NEW NEW NEW 9. dec
+# NEW PL
 
-#Profile likelihoods #comment 9. dec: PL ikke fikset endnu
-prof.b0 <- function(beta0, x = log.data$AIDS_yes[2], n = log.data$n[2]){
-  p <- exp(beta0)/(1+exp(beta0))
-  return(-sum(dbinom(x, size = n, prob = p, log = T)))
+nll.beta0.pfl <- function(beta_0, event = log.data$AIDS_yes
+                    , n = log.data$n
+                    , treatment = c(1,0)){
+  fun.tmp <- function(beta_1, beta_0){
+    theta <- exp(beta_0+beta_1*treatment)/(1+exp(beta_0+beta_1*treatment))
+    nll.tmp <- -sum(log(theta)*event + (n-event)*log((1 - theta)))
+    return(nll.tmp)
+  }
+  nll <- nlminb(start = c(1), objective = fun.tmp, beta_0 = beta_0)$objective
+  return(nll)
 }
 
-prof.b1 <- function(beta1, beta0, x = log.data$AIDS_yes[1], n = log.data$n[1]){
-  p <- exp(beta0+beta1)/(1+exp(beta0+beta1))
-  return(-sum(dbinom(x, size = n, prob = p, log = T)))
+nll.beta1.pfl <- function(beta_1, event = log.data$AIDS_yes
+                    , n = log.data$n
+                    , treatment = c(1,0)){
+  fun.tmp <- function(beta_0, beta_1){
+    theta <- exp(beta_0+beta_1*treatment)/(1+exp(beta_0+beta_1*treatment))
+    nll.tmp <- -sum(log(theta)*event + (n-event)*log((1 - theta)))
+    return(nll.tmp)
+  }
+  nll <- nlminb(start = c(1), objective = fun.tmp, beta_1 = beta_1)$objective
+  return(nll)
 }
+
 #beta intervals for examination
-beta.zero.sims <- seq(-1.5,-0.6,0.01)
-beta.one.sims <- seq(-1.3,-0.2,0.01)
+beta.zero.sims <- seq(beta[1]-3*sd[1],beta[1]+3*sd[1],0.01)
+beta.one.sims <- seq(beta[2]-3*sd[2],beta[2]+3*sd[2],0.01)
 #calculate profile likelihoods
-pL.b0 <- sapply(beta.zero.sims, FUN = prof.b0)
-pL.b1 <- sapply(beta.one.sims, FUN = prof.b1, beta0 = beta_0)
+pL.b0 <- sapply(beta.zero.sims, FUN = nll.beta0.pfl)
+pL.b1 <- sapply(beta.one.sims, FUN = nll.beta1.pfl)
 #plots
 par(mfrow=c(1,2))
 plot(beta.zero.sims
      , -(pL.b0+max(-pL.b0))
      , "l"
      , main = TeX("Profile log-likelihood: $\\beta_0$"))
+grid()
 abline(h = -qchisq(0.95, df = 1)/2, lty = "dashed")
 plot(beta.one.sims
      , -(pL.b1+max(-pL.b1))
      , "l"
      , main = TeX("Profile log-likelihood: $\\beta_1$"))
+grid()
 abline(h = -qchisq(0.95, df = 1)/2, lty = "dashed")
 ```
 
