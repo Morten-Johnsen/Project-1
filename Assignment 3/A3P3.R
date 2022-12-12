@@ -169,10 +169,11 @@ ggplot(D)+
                                                         sd = pars2$sigma[1])) +
   stat_function(aes(colour='2nd'), fun = dnorm, n = dim(D)[1], args = list(mean = pars2$mu[2],
                                                         sd = pars2$sigma[2])) +
-  geom_line(aes(x = interval, y = dist2, colour = "Combined"), lwd=1.1)+
-  scale_colour_manual(values = c("blue", "yellow", "springgreen4"))+
+  geom_line(aes(x = interval, y = dist2, colour = "Combined"), size = 1.5)+
+  scale_colour_manual(values = c("blue", "orange", "springgreen4"))+
   labs(colour = "", x = "SLV")+
   theme_bw()+
+  theme(legend.position = "top")+
   ggtitle("(2) Normal mixture model fitted to SLV")
 
 
@@ -207,10 +208,11 @@ ggplot(D)+
                                                         sd = pars3$sigma[2])) +
   stat_function(aes(colour='3rd'), fun = dnorm, n = dim(D)[1], args = list(mean = pars3$mu[3],
                                                         sd = pars3$sigma[3])) +
-  geom_line(aes(x = interval, y = dist3, colour = "Combined"))+
-  scale_colour_manual(values = c("blue", "yellow","turquoise3", "springgreen4"))+
+  geom_line(aes(x = interval, y = dist3, colour = "Combined"), size = 1.5)+
+  scale_colour_manual(values = c("blue", "orange","turquoise3", "springgreen4"))+
   labs(colour = "", x = "SLV")+
   theme_bw()+
+  theme(legend.position = "top")+
   ggtitle("(3) Normal mixture model fitted to SLV")
 
 D$interval <- seq(min(D$SLV), max(D$SLV), length.out = length(D$SLV))
@@ -218,7 +220,7 @@ D$dist3 <- sapply(D$interval, final.Dist, delta = pars3$delta, mu = pars3$mu, si
 ggplot(D)+
   geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
   geom_line(aes(x = interval, y = dist3), colour = "blue")+
-  ggtitle("(3) Normal distribution fitted to SLV")
+  ggtitle("(3) Normal distribution fitted to SLV") 
 #with delta = 0.83, 0.06, 0.10, for red, orange, blue
 ##################################################
 #comparing the nlls of the lts and the three normal dists:
@@ -522,10 +524,11 @@ ggplot(D)+
                                                         sd = mle2.HMM$sigma[1])) +
   stat_function(aes(colour='2nd'), fun = dnorm, n = dim(D)[1], args = list(mean = mle2.HMM$mu[2],
                                                         sd = mle2.HMM$sigma[2])) +
-  geom_line(aes(x = interval, y = distHMM2, colour = "Combined"))+
-  scale_colour_manual(values = c("blue", "yellow","springgreen4"))+
+  geom_line(aes(x = interval, y = distHMM2, colour = "Combined"), size = 1.5)+
+  scale_colour_manual(values = c("blue", "orange","springgreen4"))+
   labs(colour = "", x = "SLV")+
   theme_bw()+
+  theme(legend.position = "top")+
   ggtitle("HMM with 2 normal distributions fitted to SLV")
 
 m3 <- 3
@@ -547,10 +550,11 @@ ggplot(D)+
                                                         sd = mle3.HMM$sigma[2])) +
   stat_function(aes(colour='3rd'), fun = dnorm, n = dim(D)[1], args = list(mean = mle3.HMM$mu[3],
                                                         sd = mle3.HMM$sigma[3])) +
-  geom_line(aes(x = interval, y = distHMM2, colour = "Combined"))+
-  scale_colour_manual(values = c("blue", "yellow","turquoise3", "springgreen4"))+
+  geom_line(aes(x = interval, y = distHMM3, colour = "Combined"), size = 1.5)+
+  scale_colour_manual(values = c("blue", "orange","turquoise3", "springgreen4"))+
   labs(colour = "", x = "SLV")+
   theme_bw()+
+  theme(legend.position = "top")+
   #xlim(c(-0.985,-0.90))+
   ggtitle("HMM with 3 normal distributions fitted to SLV")
 
