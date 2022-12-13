@@ -83,6 +83,13 @@ x.no.AZT <- log.data %>%
 no.AZT.par <- nlminb(start = 0.1, objective = testDistribution
                      , x = c(x.no.AZT[1], x.no.AZT[2])
                      , distribution = "binomial")
+
+#OWN.IMPLMTTN created for ensuring that the equations in the presentation works exactly as expected. I've not saved
+#the use of the equation.
+own.implmttn <- function(theta, y = log.data$AIDS_yes, n = log.data$n){
+  nll <- y*log(theta)+(n-y)*log(1-theta)
+  return(-sum(nll))
+}
 ```
 
 Testing if there's a difference between the two groups:
