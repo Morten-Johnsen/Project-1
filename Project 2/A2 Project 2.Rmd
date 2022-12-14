@@ -168,6 +168,8 @@ log.reg.no.effect <- nlminb(start = 1, objective = nll.log.no.effect
 log.reg.no.effect$par
 ```
 
+
+
 Run the LRT (assuming regularity of the likelihoods (*page 36*)):
 
 ```{r}
@@ -226,9 +228,28 @@ chi.squared.Score <- t(S)%*%solve(V_S)%*%S
 (1 - pchisq(chi.squared.Score, df = 1))
 p.value.Score <- as.numeric(1 - pchisq(chi.squared.Score, df = 1))
 
+### Numerical score test:
+nll.log.no.effect2 <- function(theta, event = log.data$AIDS_yes, n = log.data$n, treatment = c(1,0)){
+  
+  beta0 <- theta[1]
+  beta1 <- theta[2]
+  
+  theta <- exp(beta0 + beta1*treatment)/(1 + exp(beta0 + beta1*treatment))
+  
+  nll <- -sum(log(theta)*event  + log(1-theta)*(n - event))
+  return(nll)
+} 
+
+S_beta0 <- grad(nll.log.no.effect2, x = c(log.reg.no.effect$par, 0))
+I_beta0 <- solve(hessian(nll.log.no.effect2, x = c(log.reg.no.effect$par, 0)))
+chi_squared_test_value <- t(S_beta0) %*% I_beta0 %*% S_beta0
+p_value_score_numeric <- (1 - pchisq(chi_squared_test_value, df = 1))
+### Numerical score test end
+
 comp.table <- rbind("Log ratio test" = c(p.value.LRT, "Show that the addition of the treatment effect (beta1) is significant.")
                     , "Wald test" = c(wald.p.value,"Show that the addition of the treatment effect (beta1) is significant.")
-                    , "Score test" = c(p.value.Score, "Show that the two treatment groups cannot be treated as being just one group")); colnames(comp.table) <- c("p-value", "interpretation")
+                    , "Score test" = c(p.value.Score, "Show that the two treatment groups cannot be treated as being just one group")
+                    , "Numeric Score test" = c(p_value_score_numeric, "Show that the two treatment groups cannot be treated as being just one group")); colnames(comp.table) <- c("p-value", "interpretation")
 comp.table
 ```
 
