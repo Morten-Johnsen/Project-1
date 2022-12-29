@@ -10,6 +10,8 @@ output:
 Setting working directories and loading the data. Data is also normalized.
 
 ```{r}
+knitr::opts_chunk$set(warning = F, fig.height = 4, message = F, dpi = 500)
+rm(list = ls())
 library(ggplot2)
 library(numDeriv)
 library(betareg)

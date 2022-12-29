@@ -37,11 +37,11 @@ library(survminer)
 ### Read the data Logistic.txt into R.
 
 ```{r}
-# if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
-#   setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/Project 2/")
-# } else {
-#   setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
-# }
+if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
+  setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/Project 2/")
+} else {
+  setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
+}
 
 log.data <- read.table("Logistic.txt", header=TRUE, sep="", 
                        as.is=TRUE)
@@ -195,6 +195,13 @@ cat("The wald test statistic = ",waldTestStatistic,
 #### The score test
 
 ##From blackboard on 15/11
+log-l:
+$$
+\begin{split}
+l(\theta)=&Y_1(\beta_0+\beta_1)-m_1log\left( 1+e^{\beta_0+\beta_1}\right)+\\&Y_2\beta_0-m_2log\left(1+e^{\beta_0}\right)
+\end{split}
+$$
+Score functions:
 $$
 \begin{split}
 S_1 &= Y_1-\frac{m_1\cdot e^{\beta_0+\beta_1}}{1+e^{\beta_0+\beta_1}}+Y_2-\frac{m_2\cdot e^{\beta_0}}{1+e^{\beta_0}}\\
@@ -306,8 +313,17 @@ See slides 31-33 from week 6 for calculations by hand.
 Manual Log-rank test:
 
 ```{r}
-source("../kaplan-meier-manual.R")
-source("../Manuel Log-rant (TEST).R")
+survdiff(formula=Surv(time, event)~tx, data=actg)
+
+if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
+  setwd("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/Project 2/")
+  source("../kaplan-meier-manual.R")
+  source("../Manuel Log-rant (TEST).R")
+} else {
+  setwd("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1")
+  source("kaplan-meier-manual.R")
+  source("Manuel Log-rant (TEST).R")
+}
 
 logRank(data = actg, group = "tx", event = "event", time = "time")
 ```

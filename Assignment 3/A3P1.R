@@ -492,8 +492,8 @@ logLik.normTrans.comb <- -combined_model$objective+sum(log(-1/(D$pow.obs.norm*(-
 (AIC.normTrans.comb <- -2*(logLik.normTrans.comb) + 2*length(combined_model$par))
 
 #til beregning af sigma:
-var.lin.mod <- 1/length(D$transformed.pow.obs.norm) * sum( (D$transformed.pow.obs.norm - ( linear_model$par[1] + linear_model$par[2]*D$ws30 + linear_model$par[3]*D$ws30^2 ))^2  )
-var.comb.mod <- combined_model$par[5]
+( var.lin.mod <- 1/length(D$transformed.pow.obs.norm) * sum( (D$transformed.pow.obs.norm - ( linear_model$par[1] + linear_model$par[2]*D$ws30 + linear_model$par[3]*D$ws30^2 ))^2  ) )
+( var.comb.mod <- combined_model$par[5] )
 
 #discussion:
 #(se bagerste side i bogen med egne noter)
