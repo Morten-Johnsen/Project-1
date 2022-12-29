@@ -313,7 +313,7 @@ ParametricBootCI <- data.frame(round(cbind(c(pars2$mu, pars2$sigma^2, pars2$delt
             quantile(Sigma[ ,2],prob=c(0.025,0.975))^2,
             quantile(Delta[ ,1],prob=c(0.025,0.975)),
             quantile(Delta[ ,2],prob=c(0.025,0.975)))),
-      digits = 5)); colnames(ParametricBootCI) <- c("MLE", "2.5%", "97.5%"); rownames(ParametricBootCI) <- c("Mu1", "Mu2", "Sigma1", "Sigma2", "Delta1", "Delta2")
+      digits = 5)); colnames(ParametricBootCI) <- c("MLE", "2.5%", "97.5%"); rownames(ParametricBootCI) <- c("Mu1", "Mu2", "Sigma1^2", "Sigma2^2", "Delta1", "Delta2")
 ParametricBootCI[,c(2,1,3)]
 
 #Interpretations:
@@ -371,10 +371,10 @@ N.pl <- function(eta0, n.dist, y, first=T){ #to be used for PL of the 2nd varian
 
 eta1.w <- seq(opt2$par[m+1]-6*sqrt(V.w2)[m+1],
               opt2$par[m+1]+6*sqrt(V.w2)[m+1],
-              length=100)
+              length=50)
 eta2.w <- seq(opt2$par[2*m]-6*sqrt(V.w2)[2*m],
              opt2$par[2*m]+6*sqrt(V.w2)[2*m],
-            length=100)
+            length=50)
 m <- 2
 N.llp <- sapply(X = eta1.w, FUN=N.pl, n.dist=m, y=D$SLV)
 N.llp2 <- sapply(X = eta2.w, FUN=N.pl, n.dist=m, y=D$SLV, first=F)
@@ -503,7 +503,7 @@ N.HMM.mle.nlminb <- function(x,m,mu0,sigma0,gamma0,...)
   list(mu=pn$mu,sigma=pn$sigma,gamma=pn$gamma,delta=pn$delta,   
        code=mod$convergence,mllk=mllk,AIC=AIC,BIC=BIC)   
 }
-#following five lines are repeated from above
+#following five lines are repeated from above?
 m <- 2
 mu <- c(-2,2) * mean(D$SLV) #arbitrary
 sigma <- c(1/2,4) * sd(D$SLV) #arbitrary

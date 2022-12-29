@@ -1,8 +1,13 @@
 #kaplan.meier survival curves function
 library(tidyverse)
 
-actg320 <- read.table("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/actg320.txt", header=TRUE, sep="", 
-                      as.is=TRUE)
+if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
+  actg320 <- read.table("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/actg320.txt", header=TRUE, sep="", 
+                        as.is=TRUE)
+  } else {
+    actg320 <- read.table("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1/actg320.txt", header=TRUE, sep="", 
+                          as.is=TRUE)
+}
 
 #select time, event and tx as they are the only relevant variables in this project
 actg <- actg320 %>%

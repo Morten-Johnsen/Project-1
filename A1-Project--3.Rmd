@@ -95,6 +95,7 @@ lcauchyFUNC <- function(p, data){
   gam <- p[2] #scale R > 0
   return(-sum(dcauchy(x = data, location = x0, scale = gam, log = T)))
 }
+
 llstFUNC <- function(p, data){ #location-scale t-distribution
   return(-sum(dlst(x = data, df = p[1], mu = p[2], sigma = p[3], log = T)))
 }
@@ -109,6 +110,17 @@ par.cauchy <- nlminb(start = c(0,1), objective = lcauchyFUNC, data = D$SLV)
 par.lst <- nlminb(start = c(1,1,1), objective = llstFUNC, data = D$SLV)
 par.gn <- nlminb(start = c(1,1,1), objective = lgnFUNC, data = D$SLV)
 par.sn <- nlminb(start = c(1,1,1), objective = lsnFUNC, data = D$SLV)
+
+lst.manual <- function(data, mle){
+  df <- mle[1]
+  location <- mle[2]
+  scale <- mle[3]
+  x <- data
+  return(sum( log( gamma((df+1) / 2) / (scale*sqrt(df*pi)*gamma(df/2)) * ((df + ((x - location) / scale)^2) / df)^(-(df+1) / 2) ) ) )
+}
+lst.manual(data = D$SLV, mle = par.lst$par);-par.lst$objective#den passer vist, det er den rigtige pdf, som er skrevet ind manuelt ovenfor
+#lst.manual(data = D$SLV, mle = c(4.77473,par$par));-par$objective
+lst.manual(data = D$SLV, mle = c(par.lst$par[1],0,1));sum(dt(x=D$SLV, df=par.lst$par[1], log=T))#mu=0, sigma = 1, giver det samme som student t
 
 ggplot(D)+
   geom_histogram(aes(x = SLV, y= ..density..,), color='black') + #color, fill
@@ -264,6 +276,7 @@ V.lst <- diag(solve(H.lst))
 wald.lst <- replicate(3,mle.lst) + cbind(rep(0,3),-1,1) * qnorm(1-alpha/2) * replicate(3, sqrt(V.lst))
 CIs <- data.frame(round(cbind(wald.lst,rbind(CI.df.lst, CI.mu.lst, CI.sigma.lst)),6)); colnames(CIs) <- c("MLE", "Wald lower", "Wald upper", "Profile lower", "Profile upper"); rownames(CIs) <- c("df", "mu", "sigma")
 CIs
+
 
 temp1 <- paste("df == ", round(mle.lst[1], digits=2))
 temp2 <- paste("mu == ", round(mle.lst[2], digits=5))

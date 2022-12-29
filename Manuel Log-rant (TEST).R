@@ -1,5 +1,9 @@
 #Comparing Survival Functions
-source("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/kaplan-meier-manual.R")
+if (Sys.getenv("LOGNAME") == "mortenjohnsen"){
+  source("/Users/mortenjohnsen/OneDrive - Danmarks Tekniske Universitet/DTU/9. Semester/02418 - Statistical Modelling/Project-1/kaplan-meier-manual.R")
+} else {
+  source("~/Documents/02418 Statistical Modelling/Assignments/Assignment 1/Project-1/kaplan-meier-manual.R")
+}
 
 logRank <- function(data = actg, group = "tx", event = "event", time = "time"){
   

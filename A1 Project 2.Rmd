@@ -94,6 +94,7 @@ own.implmttn <- function(theta, y = log.data$AIDS_yes, n = log.data$n){
 
 Testing if there's a difference between the two groups:
 ```{r}
+bin.par$par;AZT.par$par;no.AZT.par$par
 p.hat <- sum(log.data$AIDS_yes)/sum(log.data$n)#bin.par$par
 
 
@@ -416,7 +417,7 @@ actg_tx <- filter(actg, tx == 1)
 actg_no_tx = filter(actg, tx == 0)
 #this is larger than 2 and thus statistically significant (skal der sammenlignes med t-dist eller chi_squared?)
 ```
-What we did the first time around was actaully using the analytical derivations and then using these to do the tests. I have commented the actual numerical analysis but have left the first results uncommented in order not to mess with the code. See exp.nll just below for "analytical optimization" and exp.ll.NUM for numerical optimization.
+What we did the first time around was actually using the analytical derivations and then using these to do the tests. I have commented the actual numerical analysis but have left the first results uncommented in order not to mess with the code. See exp.nll just below for "analytical optimization" and exp.ll.NUM for numerical optimization.
 
 ```{r}
 exp.nll <- function(theta, time = actg$time, event = actg$event){ #this isn't numerical? KOMMENTAR
@@ -603,7 +604,8 @@ beta_no_treatment_effect <- nlminb(start = 1
 
 beta_no_treatment_effect$par
 #Comparing MLEs with previous result
-exp(cumsum(beta_hat$par)); theta.hat.tx; theta.hat.no.tx; theta.hat.both; exp(beta_no_treatment_effect$par)
+exp(cumsum(beta_hat$par)); theta.hat.no.tx; theta.hat.tx
+exp(beta_no_treatment_effect$par);theta.hat.both
 ```
 
 
@@ -723,7 +725,7 @@ This brings us to how we are to interpret the uncensored and censored values. Th
 $$
 L(\theta)_{uncensored}=p_{\theta,exp}(x_i)=\frac{1}{\theta} e^{-\frac{1}{\theta}x_i}
 $$
-For the uncensored values we will simply define the likelihood as the probability of observing a time value greater than the one registered for said person, thus using the cumulative distribution function:
+For the censored values we will simply define the likelihood as the probability of observing a time value greater than the one registered for said person, thus using the cumulative distribution function:
 $$
 L(\theta)_{censored}=P_{\theta,exp}(x_i > t)=1 - P_{\theta,exp}(x_i\leq t)=1 - (1-e^{-\frac{1}{\theta}x_i}) =e^{-\frac{1}{\theta}x_i}
 $$

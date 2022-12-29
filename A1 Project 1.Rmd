@@ -238,8 +238,11 @@ lambda <- round(theta.hat$par, 2)
 D$transformed.pow.obs.norm <- Trans.eq1(lambda, D$pow.obs.norm)
 
 #Check qqplot:
-par(mfrow = c(1,2))
+par(mfrow = c(1,3))
 y <- Trans.eq1(lambda, D$pow.obs.norm)
+qqnorm(D$pow.obs.norm)
+grid()
+qqline(D$pow.obs.norm)
 qqnorm(y)
 grid()
 qqline(y)
@@ -257,7 +260,7 @@ Now we can calculate the pdf of y as:
 $$
 f_y(y) = \dfrac{f_x(x)}{\left\vert \frac{dg}{dx} \right\vert}
 $$
-This finally yield:
+This finally yields:
 $$
 f_x(x) = f_y(y) \left\vert \dfrac{dg}{dx} \right\vert = f_y(y) \dfrac{-1}{x(-1+x^\lambda)}
 $$
@@ -305,6 +308,7 @@ theta.hat.y.alt <- nlminb(start = c(0,1), objective = nll.y.alt
        , y = Trans.eq1(lambda, D$pow.obs.norm))
 
 theta.hat.y$par
+
 #theta.hat.y.alt$par #using the transformed input instead of x
 #These yield the same estimates#
 #### Alternative end ####
@@ -404,6 +408,15 @@ print(paste("AIC normal transformation: ", 2*theta.hat.y$objective+2*2))
 print(paste("AIC beta distribution: ", 2*par.beta$objective+2*2))
 print(paste("AIC exponential distribution: ", 2*par.exp$objective+2*1))
 print(paste("AIC gamma distributioun: ", 2*par.gamma$objective+2*2))
+
+#felt the need to compare with objectie and pars for just using normal w/o calculating L based on change of variable:
+par.norm <- nlminb(start = c(0,1), objective = testDistribution,
+                  distribution = "normal",
+                  x = D$transformed.pow.obs.norm)
+-par.norm$objective + sum(log(-1/(D$pow.obs.norm*(-1+D$pow.obs.norm^0.26))))
+-theta.hat.y$objective
+par.norm$par;theta.hat.y$par
+#### done with the comparison
 ```
 From this comparison we see that the applied transformation and subsequent fitting of a normal distribution is the most appropriate model. The normal model is `r theta.hat.y$objective/par.beta$objective` times more likely than the beta distribution (p. 30).
 
